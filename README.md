@@ -8,10 +8,6 @@ Proyecto de Dirección de Proyectos Informáticos.
 
 Este repositorio contiene la documentación y el prototipo front-end del sistema de control de acceso y cobro para estacionamiento.
 
-## Prototipo Front-End
-
-Diseño generado a partir de Figma:  
-Parking Access Control System.
 
 ## Cómo ejecutar el front-end
 
