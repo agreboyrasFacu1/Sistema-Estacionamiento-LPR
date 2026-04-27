@@ -1,11 +1,20 @@
+# Sistema de Estacionamiento LPR
 
-  # Parking Access Control System
+Sistema automatizado de control de acceso y cobro de vehículos mediante reconocimiento de patentes (LPR).
 
-  This is a code bundle for Parking Access Control System. The original project is available at https://www.figma.com/design/yYJ8PLExcpp4IVuSXJqZ7E/Parking-Access-Control-System.
+Proyecto de Dirección de Proyectos Informáticos.
 
-  ## Running the code
+## Descripción
 
-  Run `npm i` to install the dependencies.
+Este repositorio contiene la documentación y el prototipo front-end del sistema de control de acceso y cobro para estacionamiento.
 
-  Run `npm run dev` to start the development server.
-  
+## Prototipo Front-End
+
+Diseño generado a partir de Figma:  
+Parking Access Control System.
+
+## Cómo ejecutar el front-end
+
+```bash
+npm i
+npm run dev
