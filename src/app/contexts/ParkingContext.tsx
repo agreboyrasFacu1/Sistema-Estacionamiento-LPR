@@ -1,23 +1,52 @@
 import React, {
   createContext,
-  useContext,
-  useState,
   ReactNode,
+  useContext,
   useEffect,
+  useMemo,
+  useState,
 } from 'react';
 import {
-  VehicleEntry,
-  VehicleCategory,
-  SystemLog,
-  LPRDetection,
   DashboardStats,
+  LPRCorrection,
+  LPRDetection,
+  PaymentMethod,
+  PricingRule,
+  Subscriber,
+  SystemLog,
+  TicketOperation,
+  VehicleCategory,
+  VehicleEntry,
+  WhiteRunIncident,
 } from '../types';
 import {
-  MOCK_VEHICLES,
   MOCK_LOGS,
-  SIMULATED_PLATES,
-  calculateParkingFee,
+  MOCK_SUBSCRIBERS,
+  MOCK_TICKETS,
+  MOCK_VEHICLES,
+  MOCK_WHITE_RUN_INCIDENTS,
+  PRICING_RULES,
 } from '../data/mockData';
+import { normalizePlate } from '../domain/plates';
+import { calculateParkingFee, normalizePricingRule } from '../domain/pricing';
+import {
+  calculateDurationMinutes,
+  createExitGraceUntil,
+  isWithinExitGrace,
+} from '../domain/stays';
+import {
+  getSubscriberByPlate as findSubscriberByPlate,
+  getSubscriberValidity,
+  isActiveMonthlySubscriber,
+} from '../domain/subscribers';
+import { createTicketNumber, createTicketOperation } from '../domain/tickets';
+import {
+  calculateLprAccuracy,
+  simulatedLprProvider,
+  TARGET_LPR_ACCURACY,
+} from '../domain/lpr';
+import { calculateWhiteRunDifference } from '../domain/whiteRun';
+import { loadFromStorage, saveToStorage } from '../services/storage';
 import { useAuth } from './AuthContext';
 
 interface ParkingContextType {
@@ -25,140 +54,517 @@ interface ParkingContextType {
   logs: SystemLog[];
   currentDetection: LPRDetection | null;
   stats: DashboardStats;
-  simulateDetection: () => void;
+  pricingRules: PricingRule[];
+  subscribers: Subscriber[];
+  tickets: TicketOperation[];
+  whiteRunIncidents: WhiteRunIncident[];
+  lprCorrections: LPRCorrection[];
+  lprAccuracy: number | null;
+  lprTargetAccuracy: number;
+  simulateDetection: () => Promise<void>;
   addVehicleEntry: (
     plate: string,
     category: VehicleCategory
   ) => Promise<VehicleEntry>;
-  processExit: (vehicleId: string) => Promise<VehicleEntry>;
+  processPayment: (
+    vehicleId: string,
+    paymentMethod: PaymentMethod,
+    manualAmount?: number
+  ) => Promise<VehicleEntry>;
+  confirmVehicleExit: (vehicleId: string) => Promise<VehicleEntry>;
+  processExit: (
+    vehicleId: string,
+    paymentMethod: PaymentMethod
+  ) => Promise<VehicleEntry>;
   searchVehicle: (plate: string) => VehicleEntry | undefined;
+  searchVehicleByQuery: (query: string) => VehicleEntry | undefined;
+  checkDuplicatePlate: (plate: string) => boolean;
   addLog: (
     type: SystemLog['type'],
     message: string,
-    vehicleId?: string
+    vehicleId?: string,
+    metadata?: SystemLog['metadata']
   ) => void;
+  addPricingRule: (rule: Omit<PricingRule, 'id'>) => void;
+  updatePricingRule: (rule: PricingRule) => void;
+  deletePricingRule: (id: string) => void;
+  addSubscriber: (subscriber: Omit<Subscriber, 'id' | 'createdAt'>) => void;
+  updateSubscriber: (subscriber: Subscriber) => void;
+  deleteSubscriber: (id: string) => void;
+  getSubscriberByPlate: (plate: string) => Subscriber | undefined;
+  recordLprCorrection: (detectedPlate: string, correctedPlate: string, confidence: number) => void;
+  addWhiteRunIncident: (payload: Omit<WhiteRunIncident, 'id' | 'createdAt' | 'userId' | 'status'>) => void;
+  resolveWhiteRunIncident: (id: string) => void;
 }
 
-const ParkingContext = createContext<ParkingContextType | undefined>(
-  undefined
-);
+const ParkingContext = createContext<ParkingContextType | undefined>(undefined);
 
 export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const { user } = useAuth();
-  const [vehicles, setVehicles] = useState<VehicleEntry[]>(MOCK_VEHICLES);
-  const [logs, setLogs] = useState<SystemLog[]>(MOCK_LOGS);
+  const { user, isTrainingMode } = useAuth();
+  const [vehicles, setVehicles] = useState<VehicleEntry[]>(() =>
+    loadFromStorage('vehicles', MOCK_VEHICLES)
+  );
+  const [logs, setLogs] = useState<SystemLog[]>(() =>
+    loadFromStorage('logs', MOCK_LOGS)
+  );
   const [currentDetection, setCurrentDetection] =
     useState<LPRDetection | null>(null);
+  const [pricingRules, setPricingRules] = useState<PricingRule[]>(() =>
+    loadFromStorage('pricing-rules', PRICING_RULES)
+  );
+  const [subscribers, setSubscribers] = useState<Subscriber[]>(() =>
+    loadFromStorage('subscribers', MOCK_SUBSCRIBERS)
+  );
+  const [tickets, setTickets] = useState<TicketOperation[]>(() =>
+    loadFromStorage('tickets', MOCK_TICKETS)
+  );
+  const [whiteRunIncidents, setWhiteRunIncidents] = useState<WhiteRunIncident[]>(
+    () => loadFromStorage('white-run-incidents', MOCK_WHITE_RUN_INCIDENTS)
+  );
+  const [lprCorrections, setLprCorrections] = useState<LPRCorrection[]>(() =>
+    loadFromStorage('lpr-corrections', [])
+  );
 
-  // Calculate dashboard stats
-  const stats: DashboardStats = {
-    vehiclesInside: vehicles.filter((v) => !v.exitTime).length,
-    todayEntries: vehicles.length,
-    todayRevenue: vehicles
-      .filter((v) => v.isPaid)
-      .reduce((sum, v) => sum + (v.amount || 0), 0),
-    averageDuration: Math.round(
-      vehicles
-        .filter((v) => v.duration)
-        .reduce((sum, v) => sum + (v.duration || 0), 0) / vehicles.length || 0
-    ),
-  };
-
-  // Simulate LPR detection
-  const simulateDetection = () => {
-    const randomPlate =
-      SIMULATED_PLATES[Math.floor(Math.random() * SIMULATED_PLATES.length)];
-    const confidence = Math.random() * 0.3 + 0.7; // 70-100% confidence
-
-    setCurrentDetection({
-      plate: randomPlate,
-      confidence,
-      timestamp: new Date().toISOString(),
-      isValid: confidence > 0.8,
-    });
-
-    // Clear detection after 5 seconds
-    setTimeout(() => setCurrentDetection(null), 5000);
-  };
-
-  const addVehicleEntry = async (
-    plate: string,
-    category: VehicleCategory
-  ): Promise<VehicleEntry> => {
-    const newEntry: VehicleEntry = {
-      id: Date.now().toString(),
-      licensePlate: plate.toUpperCase(),
-      category,
-      entryTime: new Date().toISOString(),
-      isPaid: false,
-      cashierId: user?.id || '1',
-      hasError: false,
-    };
-
-    setVehicles((prev) => [...prev, newEntry]);
-    addLog('entry', `Vehículo ${plate} ingresó al estacionamiento`, newEntry.id);
-
-    return newEntry;
-  };
-
-  const processExit = async (vehicleId: string): Promise<VehicleEntry> => {
-    const vehicle = vehicles.find((v) => v.id === vehicleId);
-    if (!vehicle) {
-      throw new Error('Vehicle not found');
-    }
-
-    const exitTime = new Date();
-    const entryTime = new Date(vehicle.entryTime);
-    const durationMinutes = Math.round(
-      (exitTime.getTime() - entryTime.getTime()) / (1000 * 60)
-    );
-    const amount = calculateParkingFee(vehicle.category, durationMinutes);
-
-    const updatedVehicle: VehicleEntry = {
-      ...vehicle,
-      exitTime: exitTime.toISOString(),
-      duration: durationMinutes,
-      amount,
-      isPaid: true,
-    };
-
-    setVehicles((prev) =>
-      prev.map((v) => (v.id === vehicleId ? updatedVehicle : v))
-    );
-
-    addLog(
-      'payment',
-      `Vehículo ${vehicle.licensePlate} salió - $${amount.toFixed(2)} pagado`,
-      vehicleId
-    );
-
-    return updatedVehicle;
-  };
-
-  const searchVehicle = (plate: string): VehicleEntry | undefined => {
-    return vehicles.find(
-      (v) =>
-        v.licensePlate.toLowerCase() === plate.toLowerCase() && !v.exitTime
-    );
-  };
+  useEffect(() => saveToStorage('vehicles', vehicles), [vehicles]);
+  useEffect(() => saveToStorage('logs', logs), [logs]);
+  useEffect(
+    () => saveToStorage('pricing-rules', pricingRules),
+    [pricingRules]
+  );
+  useEffect(() => saveToStorage('subscribers', subscribers), [subscribers]);
+  useEffect(() => saveToStorage('tickets', tickets), [tickets]);
+  useEffect(
+    () => saveToStorage('white-run-incidents', whiteRunIncidents),
+    [whiteRunIncidents]
+  );
+  useEffect(
+    () => saveToStorage('lpr-corrections', lprCorrections),
+    [lprCorrections]
+  );
 
   const addLog = (
     type: SystemLog['type'],
     message: string,
-    vehicleId?: string
+    vehicleId?: string,
+    metadata?: SystemLog['metadata']
   ) => {
     const newLog: SystemLog = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       type,
       message,
-      userId: user?.id || '1',
+      userId: user?.id || 'system',
       vehicleId,
+      metadata,
     };
 
     setLogs((prev) => [newLog, ...prev]);
+  };
+
+  const getSubscriberByPlate = (plate: string): Subscriber | undefined =>
+    findSubscriberByPlate(subscribers, plate);
+
+  const checkDuplicatePlate = (plate: string): boolean => {
+    const normalized = normalizePlate(plate);
+    return vehicles.some(
+      (vehicle) =>
+        normalizePlate(vehicle.licensePlate) === normalized &&
+        vehicle.status !== 'exited' &&
+        !vehicle.exitTime
+    );
+  };
+
+  const searchVehicle = (plate: string): VehicleEntry | undefined => {
+    const normalized = normalizePlate(plate);
+    return vehicles.find(
+      (vehicle) =>
+        normalizePlate(vehicle.licensePlate) === normalized &&
+        vehicle.status !== 'exited' &&
+        !vehicle.exitTime
+    );
+  };
+
+  const searchVehicleByQuery = (query: string): VehicleEntry | undefined => {
+    const normalizedQuery = normalizePlate(query);
+    return vehicles.find(
+      (vehicle) =>
+        normalizePlate(vehicle.licensePlate) === normalizedQuery ||
+        vehicle.ticketNumber === query.trim()
+    );
+  };
+
+  const calculateChargeForVehicle = (
+    vehicle: VehicleEntry,
+    paidAt: Date
+  ): {
+    amount: number;
+    duration: number;
+    paymentMethod: PaymentMethod;
+    subscriberValidity?: VehicleEntry['subscriberValidity'];
+  } => {
+    const duration = calculateDurationMinutes(vehicle.entryTime, paidAt);
+    const subscriber = getSubscriberByPlate(vehicle.licensePlate);
+    const subscriberValidity = getSubscriberValidity(subscriber, paidAt);
+    const activeMonthly = isActiveMonthlySubscriber(subscriber, paidAt);
+
+    if (activeMonthly) {
+      return {
+        amount: 0,
+        duration,
+        paymentMethod: 'subscriber',
+        subscriberValidity,
+      };
+    }
+
+    const baseAmount = calculateParkingFee(
+      vehicle.category,
+      duration,
+      pricingRules
+    );
+    const amount =
+      subscriber &&
+      subscriber.type === 'discounted' &&
+      subscriberValidity === 'active' &&
+      subscriber.discount
+        ? Number((baseAmount * (1 - subscriber.discount / 100)).toFixed(2))
+        : baseAmount;
+
+    return {
+      amount,
+      duration,
+      paymentMethod: amount === 0 ? 'no_charge' : 'cash',
+      subscriberValidity,
+    };
+  };
+
+  const stats: DashboardStats = useMemo(
+    () => ({
+      vehiclesInside: vehicles.filter((vehicle) => !vehicle.exitTime).length,
+      todayEntries: vehicles.filter((vehicle) => {
+        const today = new Date();
+        const entry = new Date(vehicle.entryTime);
+        return entry.toDateString() === today.toDateString();
+      }).length,
+      todayRevenue: vehicles
+        .filter((vehicle) => vehicle.isPaid && vehicle.paidAt)
+        .filter((vehicle) => {
+          const today = new Date();
+          const paidAt = new Date(vehicle.paidAt!);
+          return paidAt.toDateString() === today.toDateString();
+        })
+        .reduce((sum, vehicle) => sum + (vehicle.amount || 0), 0),
+      averageDuration: Math.round(
+        vehicles
+          .filter((vehicle) => vehicle.duration)
+          .reduce((sum, vehicle) => sum + (vehicle.duration || 0), 0) /
+          Math.max(vehicles.filter((vehicle) => vehicle.duration).length, 1)
+      ),
+    }),
+    [vehicles]
+  );
+
+  const lprAccuracy = useMemo(
+    () => calculateLprAccuracy(lprCorrections),
+    [lprCorrections]
+  );
+
+  const simulateDetection = async () => {
+    const detection = await simulatedLprProvider.detect();
+    setCurrentDetection(detection);
+    setTimeout(() => setCurrentDetection(null), 8000);
+  };
+
+  const addVehicleEntry = async (
+    plate: string,
+    category: VehicleCategory
+  ): Promise<VehicleEntry> => {
+    const normalizedPlate = normalizePlate(plate);
+    const subscriber = getSubscriberByPlate(normalizedPlate);
+    const subscriberValidity = getSubscriberValidity(subscriber);
+    const newEntry: VehicleEntry = {
+      id: Date.now().toString(),
+      licensePlate: normalizedPlate,
+      category,
+      entryTime: new Date().toISOString(),
+      isPaid: false,
+      cashierId: user?.id || 'system',
+      hasError: false,
+      isSubscriber: !!subscriber,
+      subscriberValidity,
+      status:
+        subscriber?.type === 'monthly' && subscriberValidity === 'active'
+          ? 'subscriber_active'
+          : 'entered',
+    };
+
+    setVehicles((prev) => [...prev, newEntry]);
+    addLog(
+      'entry',
+      `Vehiculo ${normalizedPlate} ingreso al estacionamiento${
+        subscriber ? ` (Abonado: ${subscriber.name}, ${subscriberValidity})` : ''
+      }`,
+      newEntry.id,
+      { category }
+    );
+
+    return newEntry;
+  };
+
+  const processPayment = async (
+    vehicleId: string,
+    paymentMethod: PaymentMethod,
+    manualAmount?: number
+  ): Promise<VehicleEntry> => {
+    const vehicle = vehicles.find((item) => item.id === vehicleId);
+    if (!vehicle) throw new Error('Vehiculo no encontrado');
+    if (vehicle.exitTime) throw new Error('El vehiculo ya egreso');
+
+    const paidAtDate = new Date();
+    const charge = calculateChargeForVehicle(vehicle, paidAtDate);
+    const effectivePaymentMethod =
+      charge.paymentMethod === 'subscriber' || charge.paymentMethod === 'no_charge'
+        ? charge.paymentMethod
+        : paymentMethod;
+    const paidAt = paidAtDate.toISOString();
+    const ticketNumber =
+      vehicle.ticketNumber || createTicketNumber(vehicle.id, paidAtDate);
+    const whiteRunDifference =
+      typeof manualAmount === 'number'
+        ? calculateWhiteRunDifference(charge.amount, manualAmount)
+        : undefined;
+
+    const updatedVehicle: VehicleEntry = {
+      ...vehicle,
+      paidAt,
+      exitGraceUntil: createExitGraceUntil(paidAt),
+      duration: charge.duration,
+      amount: charge.amount,
+      isPaid: true,
+      paymentMethod: effectivePaymentMethod,
+      ticketNumber,
+      subscriberValidity: charge.subscriberValidity,
+      status: 'paid',
+      whiteRunManualAmount: manualAmount,
+      whiteRunDifference,
+    };
+
+    setVehicles((prev) =>
+      prev.map((item) => (item.id === vehicleId ? updatedVehicle : item))
+    );
+
+    const ticket = createTicketOperation(
+      updatedVehicle,
+      effectivePaymentMethod,
+      user?.id || 'system',
+      paidAtDate
+    );
+    setTickets((prev) => {
+      const withoutDuplicate = prev.filter(
+        (item) => item.ticketNumber !== ticket.ticketNumber
+      );
+      return [ticket, ...withoutDuplicate];
+    });
+
+    if (isTrainingMode && typeof whiteRunDifference === 'number' && whiteRunDifference !== 0) {
+      addWhiteRunIncident({
+        vehicleId,
+        licensePlate: updatedVehicle.licensePlate,
+        systemAmount: charge.amount,
+        manualAmount,
+        difference: whiteRunDifference,
+        description: 'Diferencia detectada durante marcha blanca',
+      });
+    }
+
+    addLog(
+      'payment',
+      `Vehiculo ${updatedVehicle.licensePlate} pago ticket interno ${ticketNumber} por $${charge.amount.toFixed(2)}`,
+      vehicleId,
+      {
+        amount: charge.amount,
+        paymentMethod: effectivePaymentMethod,
+        ticketNumber,
+      }
+    );
+
+    return updatedVehicle;
+  };
+
+  const confirmVehicleExit = async (
+    vehicleId: string
+  ): Promise<VehicleEntry> => {
+    const vehicle = vehicles.find((item) => item.id === vehicleId);
+    if (!vehicle) throw new Error('Vehiculo no encontrado');
+    if (vehicle.exitTime) return vehicle;
+    if (!vehicle.isPaid) throw new Error('El pago debe registrarse antes del egreso');
+
+    const now = new Date();
+    const currentDuration = calculateDurationMinutes(vehicle.entryTime, now);
+    const currentCharge = calculateChargeForVehicle(vehicle, now);
+    const graceIsValid = isWithinExitGrace(vehicle.exitGraceUntil, now);
+    const additionalCharge = Number(
+      Math.max(0, currentCharge.amount - (vehicle.amount || 0)).toFixed(2)
+    );
+
+    if (!graceIsValid && additionalCharge > 0) {
+      const pendingVehicle: VehicleEntry = {
+        ...vehicle,
+        duration: currentDuration,
+        amount: currentCharge.amount,
+        isPaid: false,
+        status: 'payment_pending',
+      };
+      setVehicles((prev) =>
+        prev.map((item) => (item.id === vehicleId ? pendingVehicle : item))
+      );
+      addLog(
+        'error',
+        `Vehiculo ${vehicle.licensePlate} excedio la tolerancia post-pago de 3 minutos`,
+        vehicleId,
+        { additionalCharge }
+      );
+      throw new Error(
+        'La tolerancia post-pago de 3 minutos expiro. Recalcule y registre el pago nuevamente.'
+      );
+    }
+
+    const updatedVehicle: VehicleEntry = {
+      ...vehicle,
+      exitTime: now.toISOString(),
+      duration: currentDuration,
+      status: 'exited',
+    };
+
+    setVehicles((prev) =>
+      prev.map((item) => (item.id === vehicleId ? updatedVehicle : item))
+    );
+    setTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.vehicleId === vehicleId
+          ? { ...ticket, exitTime: updatedVehicle.exitTime, duration: currentDuration }
+          : ticket
+      )
+    );
+    addLog(
+      'exit',
+      `Vehiculo ${vehicle.licensePlate} egreso con ticket ${vehicle.ticketNumber || 'sin ticket'}`,
+      vehicleId,
+      { duration: currentDuration }
+    );
+
+    return updatedVehicle;
+  };
+
+  const processExit = async (
+    vehicleId: string,
+    paymentMethod: PaymentMethod
+  ): Promise<VehicleEntry> => {
+    const vehicle = vehicles.find((item) => item.id === vehicleId);
+    if (!vehicle) throw new Error('Vehiculo no encontrado');
+    if (!vehicle.isPaid) {
+      await processPayment(vehicleId, paymentMethod);
+    }
+    return confirmVehicleExit(vehicleId);
+  };
+
+  const addPricingRule = (rule: Omit<PricingRule, 'id'>) => {
+    const newRule: PricingRule = normalizePricingRule({
+      ...rule,
+      id: Date.now().toString(),
+    });
+    setPricingRules((prev) => [...prev, newRule]);
+  };
+
+  const updatePricingRule = (rule: PricingRule) => {
+    const normalized = normalizePricingRule(rule);
+    setPricingRules((prev) =>
+      prev.map((item) => (item.id === normalized.id ? normalized : item))
+    );
+  };
+
+  const deletePricingRule = (id: string) => {
+    setPricingRules((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const addSubscriber = (subscriber: Omit<Subscriber, 'id' | 'createdAt'>) => {
+    const newSubscriber: Subscriber = {
+      ...subscriber,
+      licensePlate: normalizePlate(subscriber.licensePlate),
+      additionalPlates: (subscriber.additionalPlates || []).map(normalizePlate),
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
+    setSubscribers((prev) => [...prev, newSubscriber]);
+  };
+
+  const updateSubscriber = (subscriber: Subscriber) => {
+    const normalized: Subscriber = {
+      ...subscriber,
+      licensePlate: normalizePlate(subscriber.licensePlate),
+      additionalPlates: (subscriber.additionalPlates || []).map(normalizePlate),
+    };
+    setSubscribers((prev) =>
+      prev.map((item) => (item.id === normalized.id ? normalized : item))
+    );
+  };
+
+  const deleteSubscriber = (id: string) => {
+    setSubscribers((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const recordLprCorrection = (
+    detectedPlate: string,
+    correctedPlate: string,
+    confidence: number
+  ) => {
+    const correction: LPRCorrection = {
+      id: Date.now().toString(),
+      detectedPlate: normalizePlate(detectedPlate),
+      correctedPlate: normalizePlate(correctedPlate),
+      confidence,
+      timestamp: new Date().toISOString(),
+      userId: user?.id || 'system',
+    };
+    setLprCorrections((prev) => [correction, ...prev]);
+    addLog(
+      'manual',
+      `Correccion LPR: ${correction.detectedPlate} -> ${correction.correctedPlate}`,
+      undefined,
+      { confidence }
+    );
+  };
+
+  const addWhiteRunIncident = (
+    payload: Omit<WhiteRunIncident, 'id' | 'createdAt' | 'userId' | 'status'>
+  ) => {
+    const incident: WhiteRunIncident = {
+      ...payload,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      userId: user?.id || 'system',
+      status: 'open',
+    };
+    setWhiteRunIncidents((prev) => [incident, ...prev]);
+    addLog(
+      'white_run',
+      `Incidencia de marcha blanca registrada: ${incident.description}`,
+      incident.vehicleId,
+      {
+        systemAmount: incident.systemAmount ?? null,
+        manualAmount: incident.manualAmount ?? null,
+        difference: incident.difference ?? null,
+      }
+    );
+  };
+
+  const resolveWhiteRunIncident = (id: string) => {
+    setWhiteRunIncidents((prev) =>
+      prev.map((incident) =>
+        incident.id === id ? { ...incident, status: 'resolved' } : incident
+      )
+    );
   };
 
   return (
@@ -168,11 +574,32 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
         logs,
         currentDetection,
         stats,
+        pricingRules,
+        subscribers,
+        tickets,
+        whiteRunIncidents,
+        lprCorrections,
+        lprAccuracy,
+        lprTargetAccuracy: TARGET_LPR_ACCURACY,
         simulateDetection,
         addVehicleEntry,
+        processPayment,
+        confirmVehicleExit,
         processExit,
         searchVehicle,
+        searchVehicleByQuery,
+        checkDuplicatePlate,
         addLog,
+        addPricingRule,
+        updatePricingRule,
+        deletePricingRule,
+        addSubscriber,
+        updateSubscriber,
+        deleteSubscriber,
+        getSubscriberByPlate,
+        recordLprCorrection,
+        addWhiteRunIncident,
+        resolveWhiteRunIncident,
       }}
     >
       {children}
