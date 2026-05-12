@@ -1,13 +1,24 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User } from '../types';
-import { MOCK_USERS } from '../data/mockData';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { User, UserCredential, UserRole } from '../types';
+import { MOCK_CREDENTIALS, MOCK_USERS } from '../data/mockData';
+import { loadFromStorage, saveToStorage } from '../services/storage';
 
 interface AuthContextType {
   user: User | null;
+  users: User[];
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isTrainingMode: boolean;
   toggleTrainingMode: () => void;
+  addUser: (payload: {
+    name: string;
+    email: string;
+    role: UserRole;
+    password: string;
+  }) => void;
+  updateUser: (user: User, password?: string) => void;
+  deleteUser: (id: string) => void;
+  toggleUserActive: (id: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,21 +26,55 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>(() =>
+    loadFromStorage('users', MOCK_USERS)
+  );
+  const [credentials, setCredentials] = useState<UserCredential[]>(() =>
+    loadFromStorage('credentials', MOCK_CREDENTIALS)
+  );
+  const [user, setUser] = useState<User | null>(() =>
+    loadFromStorage<User | null>('current-user', null)
+  );
   const [isTrainingMode, setIsTrainingMode] = useState(false);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  useEffect(() => {
+    saveToStorage('users', users);
+  }, [users]);
 
-    const foundUser = MOCK_USERS.find((u) => u.email === email && u.isActive);
+  useEffect(() => {
+    saveToStorage('credentials', credentials);
+  }, [credentials]);
 
-    if (foundUser) {
-      setUser(foundUser);
-      return true;
+  useEffect(() => {
+    saveToStorage('current-user', user);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const latestUser = users.find((item) => item.id === user.id);
+    if (!latestUser || !latestUser.isActive) {
+      setUser(null);
+      return;
     }
+    if (latestUser !== user) {
+      setUser(latestUser);
+    }
+  }, [users, user]);
 
-    return false;
+  const login = async (email: string, password: string): Promise<boolean> => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const foundUser = users.find(
+      (item) => item.email.toLowerCase() === normalizedEmail && item.isActive
+    );
+    if (!foundUser) return false;
+
+    const credential = credentials.find((item) => item.userId === foundUser.id);
+    if (!credential || credential.password !== password) return false;
+
+    setUser(foundUser);
+    return true;
   };
 
   const logout = () => {
@@ -41,9 +86,68 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     setIsTrainingMode((prev) => !prev);
   };
 
+  const addUser = (payload: {
+    name: string;
+    email: string;
+    role: UserRole;
+    password: string;
+  }) => {
+    const newUser: User = {
+      id: Date.now().toString(),
+      name: payload.name,
+      email: payload.email.toLowerCase().trim(),
+      role: payload.role,
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    };
+    setUsers((prev) => [...prev, newUser]);
+    setCredentials((prev) => [
+      ...prev,
+      { userId: newUser.id, password: payload.password },
+    ]);
+  };
+
+  const updateUser = (updatedUser: User, password?: string) => {
+    setUsers((prev) =>
+      prev.map((item) => (item.id === updatedUser.id ? updatedUser : item))
+    );
+    if (password) {
+      setCredentials((prev) =>
+        prev.map((item) =>
+          item.userId === updatedUser.id ? { ...item, password } : item
+        )
+      );
+    }
+  };
+
+  const deleteUser = (id: string) => {
+    setUsers((prev) => prev.filter((item) => item.id !== id));
+    setCredentials((prev) => prev.filter((item) => item.userId !== id));
+    if (user?.id === id) logout();
+  };
+
+  const toggleUserActive = (id: string) => {
+    setUsers((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, isActive: !item.isActive } : item
+      )
+    );
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, isTrainingMode, toggleTrainingMode }}
+      value={{
+        user,
+        users,
+        login,
+        logout,
+        isTrainingMode,
+        toggleTrainingMode,
+        addUser,
+        updateUser,
+        deleteUser,
+        toggleUserActive,
+      }}
     >
       {children}
     </AuthContext.Provider>

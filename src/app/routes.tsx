@@ -1,17 +1,38 @@
-import { createBrowserRouter, Navigate } from 'react-router';
+import React from 'react';
+import { createBrowserRouter, Navigate, useLocation } from 'react-router';
 import { Login } from './pages/Login';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { Dashboard } from './pages/Dashboard';
 import { VehicleEntry } from './pages/VehicleEntry';
 import { VehicleExit } from './pages/VehicleExit';
 import { Search } from './pages/Search';
 import { AdminPanel } from './pages/AdminPanel';
 import { UserManagement } from './pages/UserManagement';
+import { Subscribers } from './pages/Subscribers';
 import { NotFound } from './pages/NotFound';
 import { Layout } from './components/Layout';
+import { useAuth } from './contexts/AuthContext';
+import { UserRole } from './types';
+import { canAccessRole } from './domain/permissions';
 
-// Protected Route wrapper component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  // In a real app, check authentication here
+const ProtectedRoute = ({
+  children,
+  roles = ['cashier', 'admin'],
+}: {
+  children: React.ReactNode;
+  roles?: UserRole[];
+}) => {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (!user) {
+    return <Navigate to="/" replace state={{ from: location.pathname }} />;
+  }
+
+  if (!canAccessRole(user, roles)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <Layout>{children}</Layout>;
 };
 
@@ -19,6 +40,10 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <Login />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPassword />,
   },
   {
     path: '/dashboard',
@@ -53,9 +78,17 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: '/admin',
+    path: '/subscribers',
     element: (
       <ProtectedRoute>
+        <Subscribers />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute roles={['admin']}>
         <AdminPanel />
       </ProtectedRoute>
     ),
@@ -63,7 +96,7 @@ export const router = createBrowserRouter([
   {
     path: '/admin/users',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute roles={['admin']}>
         <UserManagement />
       </ProtectedRoute>
     ),

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, AlertCircle, Loader2 } from 'lucide-react';
+import { LogIn, AlertCircle, Loader2, Car } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -21,7 +21,7 @@ export const Login: React.FC = () => {
       if (success) {
         navigate('/dashboard');
       } else {
-        setError('Email o contraseña inválidos');
+        setError('Correo electrónico o contraseña incorrectos');
       }
     } catch (err) {
       setError('Ocurrió un error. Por favor intente nuevamente.');
@@ -31,27 +31,29 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <span className="text-white text-2xl font-bold">P</span>
+          <div className="inline-flex items-center justify-center w-18 h-18 mb-4">
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <Car className="w-9 h-9 text-white" />
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Control de Acceso de Estacionamiento
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+            Control de Acceso
           </h1>
-          <p className="text-gray-600">Sistema de Reconocimiento de Patentes</p>
+          <p className="text-gray-500">Sistema LPR · Reconocimiento de Patentes</p>
         </div>
 
         {/* Login Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-gray-900 mb-1">
               Iniciar Sesión
             </h2>
-            <p className="text-sm text-gray-600">
-              Ingrese sus credenciales para acceder al sistema
+            <p className="text-sm text-gray-500">
+              Ingrese sus credenciales para acceder
             </p>
           </div>
 
@@ -83,12 +85,21 @@ export const Login: React.FC = () => {
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Contraseña
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Contraseña
+                </label>
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                >
+                  ¿Olvidé mi contraseña?
+                </button>
+              </div>
               <input
                 id="password"
                 type="password"
@@ -122,28 +133,33 @@ export const Login: React.FC = () => {
 
           {/* Demo Credentials */}
           <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs font-medium text-gray-500 mb-3">
-              Credenciales de Demostración:
+            <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+              Credenciales de Demostración
             </p>
             <div className="space-y-2 text-xs text-gray-600">
-              <div className="flex justify-between bg-gray-50 px-3 py-2 rounded">
-                <span className="font-medium">Cajero:</span>
-                <span className="font-mono">cajero@parking.com</span>
+              <div
+                className="flex justify-between items-center bg-blue-50 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors border border-blue-100"
+                onClick={() => { setEmail('cajero@parking.com'); setPassword('demo'); }}
+              >
+                <span className="font-medium text-blue-700">Cajero</span>
+                <span className="font-mono text-blue-600">cajero@parking.com</span>
               </div>
-              <div className="flex justify-between bg-gray-50 px-3 py-2 rounded">
-                <span className="font-medium">Admin:</span>
-                <span className="font-mono">admin@parking.com</span>
+              <div
+                className="flex justify-between items-center bg-purple-50 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors border border-purple-100"
+                onClick={() => { setEmail('admin@parking.com'); setPassword('demo'); }}
+              >
+                <span className="font-medium text-purple-700">Administrador</span>
+                <span className="font-mono text-purple-600">admin@parking.com</span>
               </div>
-              <p className="text-gray-500 italic mt-2">
-                (Cualquier contraseña funciona en modo demostración)
+              <p className="text-gray-400 italic text-center mt-2">
+                Haga clic para autocompletar · Contraseña demo: demo
               </p>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-6">
-          © 2026 Sistema de Control de Acceso de Estacionamiento. Todos los derechos reservados.
+        <p className="text-center text-xs text-gray-400 mt-6">
+          © 2026 Sistema de Control de Acceso LPR. Todos los derechos reservados.
         </p>
       </div>
     </div>
