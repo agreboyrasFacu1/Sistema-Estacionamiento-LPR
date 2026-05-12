@@ -8,7 +8,7 @@ export const LPRSimulator: React.FC = () => {
 
   const handleSimulate = () => {
     setIsScanning(true);
-    simulateDetection();
+    void simulateDetection();
     setTimeout(() => setIsScanning(false), 1000);
   };
 

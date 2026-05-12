@@ -1,0 +1,59 @@
+# TODO — Deuda técnica y pendientes conocidos
+
+## Estado general
+
+El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no producción.
+
+## Pendientes críticos/altos postergados
+
+### Git y release
+- [ ] Confirmar integración contra `origin/main`.
+- [ ] Subir cambios mediante commits atómicos y trazables.
+- [ ] Evitar push directo sin revisión.
+
+### Reglas de negocio/UI
+- [ ] Verificar que no queden referencias a `5 minutos gratis`, `isFreeExit`, `tolerancia inicial` o conceptos equivalentes.
+- [ ] Validar manualmente pricing: 60, 61, 70 y 71 minutos.
+
+### Marcha blanca
+- [ ] Implementar UI real para monto manual vs monto sistema.
+- [ ] Registrar diferencias e incidencias consultables.
+- [ ] Permitir evidencia/exportación básica de estabilización.
+- [ ] No declarar marcha blanca completa hasta cerrar este punto.
+
+### LPR
+- [ ] Integrar `CameraModal` con `LprProvider`.
+- [ ] Exponer métrica de accuracy/correcciones.
+- [ ] Preparar integración futura con cámara IP real.
+- [ ] Validar objetivo de precisión >= 95% con dataset o muestra controlada.
+
+### Tests
+- [ ] Agregar tests para `plates`.
+- [ ] Agregar tests para `permissions`.
+- [ ] Agregar tests para `tickets`.
+- [ ] Agregar tests para búsqueda por ticket.
+- [ ] Agregar tests para LPR.
+- [ ] Agregar tests de storage corrupto/fallback.
+- [ ] Agregar prueba de flujo pago → tolerancia 3 min → egreso.
+
+### Seguridad
+- [ ] Migrar auth demo client-side a backend local.
+- [ ] No almacenar passwords plaintext.
+- [ ] Implementar hash de contraseñas.
+- [ ] Mantener roles protegidos server-side en fase backend.
+
+### Persistencia
+- [ ] Reemplazar `localStorage` por backend local + SQLite.
+- [ ] Agregar migraciones versionadas.
+- [ ] Definir backup/restore de base local.
+
+### Arquitectura
+- [ ] Reducir responsabilidades de `ParkingContext`.
+- [ ] Separar servicios de pagos, tickets, logs, estadías, abonados y LPR.
+- [ ] Mantener dominio puro testeable.
+
+### Documentación
+- [ ] Alinear README, manual y plan con implementación real.
+- [ ] Documentar claramente qué es demo, qué es parcial y qué queda fuera de alcance.
+
+*Nota: Estos puntos provienen de la auditoría post-implementación y del Prompt para Codex — Corrección controlada de hallazgos críticos y altos post-implementación.*
