@@ -1,0 +1,54 @@
+# Manual de Usuario - Sistema Estacionamiento LPR
+
+## Inicio de sesion
+
+Use las credenciales demo:
+
+- Cajero: `cajero@parking.com` / `demo`
+- Administrador: `admin@parking.com` / `demo`
+
+Las rutas internas requieren sesion. Las pantallas administrativas requieren rol administrador.
+
+## Ingreso de vehiculo
+
+1. Ir a Entrada.
+2. Detectar patente con el simulador/camara o cargarla manualmente.
+3. Elegir categoria: Auto, Camioneta o Moto.
+4. Confirmar ingreso.
+
+El sistema valida formato de patente y evita duplicados activos.
+
+## Salida y cobro
+
+1. Ir a Salida.
+2. Buscar por LPR, patente manual o seleccionar un vehiculo activo.
+3. Revisar duracion y monto.
+4. Para abonado mensual activo, registrar abonado.
+5. Para vehiculo con cobro, seleccionar efectivo o tarjeta y confirmar pago.
+6. Confirmar salida dentro de los 3 minutos posteriores al pago.
+7. Imprimir o cerrar el ticket interno.
+
+Si vence la tolerancia post-pago y corresponde un adicional, el sistema vuelve el estado a pago pendiente.
+
+## Busqueda
+
+La busqueda permite consultar por patente o por numero de ticket interno.
+
+## Abonados
+
+Desde Abonados se pueden crear, editar o eliminar clientes mensuales y bonificados. Un abono mensual activo pero vencido se trata como vencido para el cobro.
+
+## Administracion
+
+El administrador puede:
+
+- Administrar tarifas por categoria.
+- Consultar logs.
+- Revisar reportes basicos.
+- Administrar usuarios.
+
+La tarifa respeta primera hora base y fraccion posterior fija de 10 minutos.
+
+## Marcha blanca
+
+Use el modo entrenamiento/marcha blanca para operar en paralelo. Cuando se informe un monto manual diferente al sistema, se registra una incidencia de diferencia para estabilizacion.
