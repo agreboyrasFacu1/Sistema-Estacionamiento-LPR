@@ -27,6 +27,7 @@ import {
   MOCK_WHITE_RUN_INCIDENTS,
   PRICING_RULES,
 } from '../data/mockData';
+import { calculateDashboardStats } from '../domain/dashboard';
 import { normalizePlate } from '../domain/plates';
 import { calculateParkingFee, normalizePricingRule } from '../domain/pricing';
 import {
@@ -240,28 +241,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const stats: DashboardStats = useMemo(
-    () => ({
-      vehiclesInside: vehicles.filter((vehicle) => !vehicle.exitTime).length,
-      todayEntries: vehicles.filter((vehicle) => {
-        const today = new Date();
-        const entry = new Date(vehicle.entryTime);
-        return entry.toDateString() === today.toDateString();
-      }).length,
-      todayRevenue: vehicles
-        .filter((vehicle) => vehicle.isPaid && vehicle.paidAt)
-        .filter((vehicle) => {
-          const today = new Date();
-          const paidAt = new Date(vehicle.paidAt!);
-          return paidAt.toDateString() === today.toDateString();
-        })
-        .reduce((sum, vehicle) => sum + (vehicle.amount || 0), 0),
-      averageDuration: Math.round(
-        vehicles
-          .filter((vehicle) => vehicle.duration)
-          .reduce((sum, vehicle) => sum + (vehicle.duration || 0), 0) /
-          Math.max(vehicles.filter((vehicle) => vehicle.duration).length, 1)
-      ),
-    }),
+    () => calculateDashboardStats(vehicles),
     [vehicles]
   );
 

@@ -12,6 +12,7 @@ import { calculateParkingFee, getCategoryIcon, translateCategory } from '../doma
 import { formatDuration } from '../domain/stays';
 import { validatePlate } from '../domain/plates';
 import { getSimulatedPlates } from '../domain/lpr';
+import { createTicketOperation } from '../domain/tickets';
 
 export const MOCK_USERS: User[] = [
   {
@@ -140,7 +141,7 @@ export const MOCK_VEHICLES: VehicleEntry[] = [
     exitGraceUntil: new Date(Date.now() - 2 * 60 * 60 * 1000 + 3 * 60 * 1000).toISOString(),
     exitTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     duration: 120,
-    amount: 8,
+    amount: 8000,
     isPaid: true,
     paymentMethod: 'cash',
     cashierId: '1',
@@ -157,7 +158,7 @@ export const MOCK_VEHICLES: VehicleEntry[] = [
     exitGraceUntil: new Date(Date.now() - 4 * 60 * 60 * 1000 + 3 * 60 * 1000).toISOString(),
     exitTime: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     duration: 120,
-    amount: 5,
+    amount: 4800,
     isPaid: true,
     paymentMethod: 'card',
     cashierId: '2',
@@ -260,7 +261,16 @@ export const MOCK_SUBSCRIBERS: Subscriber[] = [
   },
 ];
 
-export const MOCK_TICKETS: TicketOperation[] = [];
+export const MOCK_TICKETS: TicketOperation[] = MOCK_VEHICLES.filter(
+  (vehicle) => vehicle.ticketNumber && vehicle.isPaid && vehicle.paymentMethod
+).map((vehicle) =>
+  createTicketOperation(
+    vehicle,
+    vehicle.paymentMethod!,
+    vehicle.cashierId,
+    new Date(vehicle.paidAt || vehicle.exitTime || vehicle.entryTime)
+  )
+);
 export const MOCK_WHITE_RUN_INCIDENTS: WhiteRunIncident[] = [];
 export const SIMULATED_PLATES = getSimulatedPlates();
 

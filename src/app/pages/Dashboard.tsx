@@ -19,6 +19,7 @@ import {
   Star,
 } from 'lucide-react';
 import { formatDuration, translateCategory, getCategoryIcon } from '../data/mockData';
+import { formatCurrencyARS } from '../utils/currency';
 import { toast } from 'sonner';
 
 export const Dashboard: React.FC = () => {
@@ -104,7 +105,7 @@ export const Dashboard: React.FC = () => {
             <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
               <DollarSign className="w-5 h-5 text-emerald-600" />
             </div>
-            <span className="text-3xl font-bold text-emerald-600">${stats.todayRevenue.toFixed(0)}</span>
+            <span className="text-3xl font-bold text-emerald-600">{formatCurrencyARS(stats.todayRevenue)}</span>
           </div>
           <p className="text-sm font-medium text-gray-700">Ingresos Hoy</p>
           <p className="text-xs text-gray-400 mt-0.5">Total recaudado</p>
