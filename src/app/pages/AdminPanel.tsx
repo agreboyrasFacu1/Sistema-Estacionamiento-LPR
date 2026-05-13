@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useParking } from '../contexts/ParkingContext';
 import { translateCategory } from '../data/mockData';
 import { PricingRule, VehicleCategory } from '../types';
@@ -17,6 +17,7 @@ import {
   Info,
 } from 'lucide-react';
 import { formatCurrencyARS, formatCurrencyARSWithCents } from '../utils/currency';
+import { resetDemoStorage } from '../services/storage';
 
 type TabType = 'pricing' | 'logs' | 'reports';
 
@@ -120,6 +121,15 @@ export const AdminPanel: React.FC = () => {
     });
   };
 
+  const handleResetDemoData = () => {
+    const confirmed = window.confirm(
+      'Esto reinicia usuarios demo, vehiculos, tickets, logs, tarifas, abonados e incidencias locales. No borra datos fuera de parking-lpr. Continuar?'
+    );
+    if (!confirmed) return;
+    resetDemoStorage();
+    window.location.reload();
+  };
+
   const filteredLogs = logFilter === 'all' ? logs : logs.filter((l) => l.type === logFilter);
 
   // Report data
@@ -141,9 +151,17 @@ export const AdminPanel: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto">
       {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Panel de Administración</h1>
-        <p className="text-gray-500">Gestión de configuración, precios y análisis del sistema</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Panel de Administración</h1>
+          <p className="text-gray-500">Gestión de configuración, precios y análisis del sistema</p>
+        </div>
+        <button
+          onClick={handleResetDemoData}
+          className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 py-2 px-4 rounded-xl font-medium transition-colors text-sm"
+        >
+          Reset demo
+        </button>
       </div>
 
       {/* Success toast */}

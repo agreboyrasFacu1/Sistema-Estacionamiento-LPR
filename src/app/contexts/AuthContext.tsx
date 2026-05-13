@@ -1,7 +1,11 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { User, UserCredential, UserRole } from '../types';
 import { MOCK_CREDENTIALS, MOCK_USERS } from '../data/mockData';
-import { loadFromStorage, saveToStorage } from '../services/storage';
+import {
+  ensureDemoStorageVersion,
+  loadFromStorage,
+  saveToStorage,
+} from '../services/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -26,6 +30,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
+  ensureDemoStorageVersion();
+
   const [users, setUsers] = useState<User[]>(() =>
     loadFromStorage('users', MOCK_USERS)
   );
