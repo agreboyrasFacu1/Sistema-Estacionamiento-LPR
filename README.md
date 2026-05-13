@@ -17,11 +17,15 @@ El sistema fue refactorizado desde prototipo visual hacia un MVP frontend persis
 ## Reglas de negocio vigentes
 
 - Categorias estrictas: Auto, Camioneta y Moto.
+- Moneda operativa: pesos argentinos (ARS).
 - El cobro base cubre la primera hora completa.
+- Auto y Camioneta: primera hora $5.000, fraccion posterior de 10 minutos $500, equivalente posterior $3.000/h.
+- Moto: primera hora $3.000, fraccion posterior de 10 minutos $300, equivalente posterior $1.800/h.
 - Luego de la primera hora, el cobro fracciona automaticamente cada 10 minutos.
 - La tolerancia es de 3 minutos posteriores al pago para confirmar el egreso.
-- La tolerancia no es una estadia gratis desde el ingreso.
+- La tolerancia no es tiempo sin cargo desde el ingreso.
 - Los abonados mensuales activos y no vencidos tienen salida sin cobro.
+- Abono mensual operativo de referencia: $150.000.
 - Los abonados vencidos o inactivos no tienen bypass de cobro.
 - El ticket emitido es interno de control, no fiscal.
 

@@ -30,6 +30,8 @@ El sistema valida formato de patente y evita duplicados activos.
 
 Si vence la tolerancia post-pago y corresponde un adicional, el sistema vuelve el estado a pago pendiente.
 
+La moneda operativa es pesos argentinos (ARS). Para Auto y Camioneta, la primera hora es $5.000 y la fraccion posterior de 10 minutos es $500. Para Moto, la primera hora es $3.000 y la fraccion posterior de 10 minutos es $300. La tolerancia no es tiempo sin cargo desde el ingreso.
+
 ## Busqueda
 
 La busqueda permite consultar por patente o por numero de ticket interno.
@@ -37,6 +39,8 @@ La busqueda permite consultar por patente o por numero de ticket interno.
 ## Abonados
 
 Desde Abonados se pueden crear, editar o eliminar clientes mensuales y bonificados. Un abono mensual activo pero vencido se trata como vencido para el cobro.
+
+El abono mensual operativo de referencia es $150.000. En este MVP frontend el abono activo se usa para validar el egreso sin cobro, no para facturar el abono.
 
 ## Administracion
 
@@ -47,7 +51,7 @@ El administrador puede:
 - Revisar reportes basicos.
 - Administrar usuarios.
 
-La tarifa respeta primera hora base y fraccion posterior fija de 10 minutos.
+La tarifa respeta primera hora base y fraccion posterior fija de 10 minutos. El ticket emitido es interno de control, no fiscal.
 
 ## Marcha blanca
 

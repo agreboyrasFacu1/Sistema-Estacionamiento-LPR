@@ -12,8 +12,11 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 - [ ] Evitar push directo sin revisión.
 
 ### Reglas de negocio/UI
-- [ ] Verificar que no queden referencias a `5 minutos gratis`, `isFreeExit`, `tolerancia inicial` o conceptos equivalentes.
+- [ ] Verificar que no queden referencias a tiempo inicial sin cargo, banderas legacy de salida sin cargo, `tolerancia inicial` o conceptos equivalentes.
 - [ ] Validar manualmente pricing: 60, 61, 70 y 71 minutos.
+- [ ] Verificar que no queden artefactos de encoding/mojibake en pantallas operativas, administracion o tickets.
+- [ ] Mantener montos ARS alineados en mock data, defaults de administracion y documentacion: Auto/Camioneta $5.000 + $500 cada 10 minutos; Moto $3.000 + $300 cada 10 minutos; abono mensual $150.000.
+- [ ] En fase backend/configuracion, reemplazar tarifas hardcodeadas de datos demo/defaults por configuracion administrable y persistente.
 
 ### Marcha blanca
 - [ ] Implementar UI real para monto manual vs monto sistema.
@@ -35,6 +38,7 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 - [ ] Agregar tests para LPR.
 - [ ] Agregar tests de storage corrupto/fallback.
 - [ ] Agregar prueba de flujo pago → tolerancia 3 min → egreso.
+- [ ] Agregar o mantener cobertura de pricing con montos ARS canonicos.
 
 ### Seguridad
 - [ ] Migrar auth demo client-side a backend local.
@@ -46,6 +50,7 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 - [ ] Reemplazar `localStorage` por backend local + SQLite.
 - [ ] Agregar migraciones versionadas.
 - [ ] Definir backup/restore de base local.
+- [ ] Modelar facturacion real del abono mensual; hoy el MVP solo usa el estado de abonado activo para bypass operativo de cobro.
 
 ### Arquitectura
 - [ ] Reducir responsabilidades de `ParkingContext`.
