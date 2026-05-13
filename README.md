@@ -11,7 +11,9 @@ El sistema fue refactorizado desde prototipo visual hacia un MVP frontend persis
 - Reglas de negocio extraidas a modulos de dominio.
 - Rutas protegidas por sesion y rol.
 - Ticket interno persistente por operacion.
-- Simulador LPR con objetivo de precision documentado.
+- Formateo monetario centralizado para pesos argentinos (ARS).
+- Reset seguro de datos demo desde Administracion para limpiar localStorage del prefijo `parking-lpr`.
+- Simulador LPR con modo webcam local de entrenamiento, sin OCR productivo real.
 - Preparacion inicial para marcha blanca mediante incidencias y diferencias.
 
 ## Reglas de negocio vigentes
@@ -73,6 +75,12 @@ Resultado: build correcto con Vite 6.4.2 y 0 vulnerabilidades altas reportadas p
 - Multiples sucursales.
 - BI avanzado.
 - Reporteria gerencial compleja.
+
+## Modo demo y webcam local
+
+La camara LPR funciona en modo entrenamiento/demo. Puede usar webcam local del navegador para mostrar una patente impresa o desde un celular, capturar un frame y continuar con una lectura simulada/corregible. Esta fase no implementa OCR productivo real ni valida precision >=95%; ese objetivo queda pendiente para una integracion LPR real con dataset medido.
+
+Si los datos locales quedan contaminados por pruebas anteriores, el administrador puede usar `Reset demo` desde Administracion. El reset solo borra claves del prefijo `parking-lpr` y recarga los seeds vigentes.
 
 ## Siguiente evolucion recomendada
 

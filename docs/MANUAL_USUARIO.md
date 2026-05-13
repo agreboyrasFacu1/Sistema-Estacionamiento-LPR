@@ -12,7 +12,7 @@ Las rutas internas requieren sesion. Las pantallas administrativas requieren rol
 ## Ingreso de vehiculo
 
 1. Ir a Entrada.
-2. Detectar patente con el simulador/camara o cargarla manualmente.
+2. Detectar patente con webcam local demo, mock LPR o cargarla manualmente.
 3. Elegir categoria: Auto, Camioneta o Moto.
 4. Confirmar ingreso.
 
@@ -44,6 +44,8 @@ El abono mensual operativo de referencia es $150.000. En este MVP frontend el ab
 
 ## Administracion
 
+El administrador puede reiniciar los datos demo con `Reset demo`. Esta accion limpia las claves locales `parking-lpr:*`, recarga seeds ARS vigentes y no borra datos fuera de la app.
+
 El administrador puede:
 
 - Administrar tarifas por categoria.
@@ -52,6 +54,10 @@ El administrador puede:
 - Administrar usuarios.
 
 La tarifa respeta primera hora base y fraccion posterior fija de 10 minutos. El ticket emitido es interno de control, no fiscal.
+
+## LPR demo con webcam local
+
+La camara local del navegador se usa solo para entrenamiento y presentaciones. El sistema muestra preview de video, permite capturar un frame, simula una lectura con confianza y permite corregir la patente antes de usarla. No es OCR productivo real y no acredita precision >=95%.
 
 ## Marcha blanca
 
