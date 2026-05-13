@@ -141,8 +141,8 @@ export const AdminPanel: React.FC = () => {
     <div className="max-w-7xl mx-auto">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Panel de AdministraciÃ³n</h1>
-        <p className="text-gray-500">GestiÃ³n de configuraciÃ³n, precios y anÃ¡lisis del sistema</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Panel de Administración</h1>
+        <p className="text-gray-500">Gestión de configuración, precios y análisis del sistema</p>
       </div>
 
       {/* Success toast */}
@@ -160,8 +160,8 @@ export const AdminPanel: React.FC = () => {
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Trash2 className="w-6 h-6 text-red-600" />
             </div>
-            <h3 className="text-center font-bold text-gray-900 mb-2">Â¿Eliminar Tarifa?</h3>
-            <p className="text-center text-sm text-gray-500 mb-5">Esta acciÃ³n no se puede deshacer.</p>
+            <h3 className="text-center font-bold text-gray-900 mb-2">¿Eliminar Tarifa?</h3>
+            <p className="text-center text-sm text-gray-500 mb-5">Esta acción no se puede deshacer.</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
@@ -200,7 +200,7 @@ export const AdminPanel: React.FC = () => {
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CategorÃ­a de VehÃ­culo
+                  Categoría de Vehículo
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {CATEGORIES.map((cat) => (
@@ -231,7 +231,7 @@ export const AdminPanel: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ej: AutomÃ³vil EstÃ¡ndar"
+                  placeholder="Ej: Automóvil Estándar"
                 />
               </div>
 
@@ -281,7 +281,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    FracciÃ³n (minutos)
+                    Fracción (minutos)
                   </label>
                   <select
                     value={formData.fraction}
@@ -307,7 +307,7 @@ export const AdminPanel: React.FC = () => {
                   placeholder="Ej: 10"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  La tolerancia oficial es de 3 minutos posteriores al pago. No aplica como estadia gratis.
+                  La tolerancia oficial es de 3 minutos posteriores al pago. No aplica como tiempo sin cargo desde el ingreso.
                 </p>
               </div>
 
@@ -320,15 +320,15 @@ export const AdminPanel: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2 text-xs text-blue-800">
                   <div>
                     <div className="font-semibold">${formData.basePrice.toFixed(2)}</div>
-                    <div className="text-blue-600">1Âª fracciÃ³n</div>
+                    <div className="text-blue-600">1ª hora</div>
                   </div>
                   <div>
                     <div className="font-semibold">${formData.hourlyRate.toFixed(2)}/h</div>
-                    <div className="text-blue-600">Adicional</div>
+                    <div className="text-blue-600">Hora posterior</div>
                   </div>
                   <div>
                     <div className="font-semibold">${formData.dailyMax.toFixed(2)}</div>
-                    <div className="text-blue-600">MÃ¡x. diario</div>
+                    <div className="text-blue-600">Máx. diario</div>
                   </div>
                 </div>
               </div>
@@ -385,8 +385,8 @@ export const AdminPanel: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h2 className="font-semibold text-gray-900 mb-0.5">ConfiguraciÃ³n de Tarifas</h2>
-                  <p className="text-sm text-gray-500">CRUD completo de precios por categorÃ­a de vehÃ­culo</p>
+                  <h2 className="font-semibold text-gray-900 mb-0.5">Configuración de Tarifas</h2>
+                  <p className="text-sm text-gray-500">CRUD completo de precios por categoría de vehículo</p>
                 </div>
                 <button
                   onClick={openAddModal}
@@ -446,15 +446,15 @@ export const AdminPanel: React.FC = () => {
                             <span className="font-semibold text-gray-900">${rule.basePrice.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Por hora:</span>
+                            <span className="text-gray-500">Hora posterior:</span>
                             <span className="font-semibold text-gray-900">${rule.hourlyRate.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-500">MÃ¡x. diario:</span>
+                            <span className="text-gray-500">Máx. diario:</span>
                             <span className="font-semibold text-gray-900">${rule.dailyMax.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-500">FracciÃ³n:</span>
+                            <span className="text-gray-500">Fracción:</span>
                             <span className="font-semibold text-gray-900">c/{rule.fraction} min</span>
                           </div>
                         </div>
@@ -463,7 +463,7 @@ export const AdminPanel: React.FC = () => {
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <span>Tolerancia post-pago: 3 min</span>
                             <span className="text-blue-600 font-medium">
-                              Ej. 3h â†’ ${(rule.basePrice + 2 * rule.hourlyRate).toFixed(2)}
+                              Ej. 3h → ${(rule.basePrice + 2 * rule.hourlyRate).toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -473,13 +473,13 @@ export const AdminPanel: React.FC = () => {
                 </div>
               )}
 
-              {/* 5-min rule notice */}
+              {/* Billing rule notice */}
               <div className="mt-5 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                 <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-blue-800">Regla de negocio especial</p>
                   <p className="text-xs text-blue-600 mt-0.5">
-                    La tarifa cubre la primera hora completa y luego fracciona automaticamente cada 10 minutos. La tolerancia de egreso ocurre solo durante los 3 minutos posteriores al pago.
+                    La tarifa cubre la primera hora completa y luego fracciona automáticamente cada 10 minutos. La tolerancia de egreso ocurre solo durante los 3 minutos posteriores al pago.
                   </p>
                 </div>
               </div>
@@ -519,7 +519,7 @@ export const AdminPanel: React.FC = () => {
                     <p className="text-sm font-medium text-red-800">
                       {errorLogs.length} error{errorLogs.length > 1 ? 'es' : ''} en el sistema
                     </p>
-                    <p className="text-xs text-red-600">Revise los logs de tipo "error" para mÃ¡s detalles</p>
+                    <p className="text-xs text-red-600">Revise los logs de tipo "error" para más detalles</p>
                   </div>
                 </div>
               )}
@@ -586,7 +586,7 @@ export const AdminPanel: React.FC = () => {
           {activeTab === 'reports' && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-semibold text-gray-900 mb-0.5">AnÃ¡lisis y Reportes</h2>
+                <h2 className="font-semibold text-gray-900 mb-0.5">Análisis y Reportes</h2>
                 <p className="text-sm text-gray-500">Resumen del rendimiento del estacionamiento</p>
               </div>
 
@@ -595,7 +595,7 @@ export const AdminPanel: React.FC = () => {
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
                   <div className="text-sm text-blue-700 mb-1 font-medium">Entradas Hoy</div>
                   <div className="text-3xl font-bold text-blue-900">{stats.todayEntries}</div>
-                  <div className="text-xs text-blue-600 mt-0.5">vehÃ­culos</div>
+                  <div className="text-xs text-blue-600 mt-0.5">vehículos</div>
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-4">
                   <div className="text-sm text-green-700 mb-1 font-medium">Ingresos Hoy</div>
@@ -616,7 +616,7 @@ export const AdminPanel: React.FC = () => {
 
               {/* Category Breakdown */}
               <div className="bg-gray-50 rounded-xl p-5">
-                <h3 className="font-semibold text-gray-900 mb-4">Desglose por CategorÃ­a</h3>
+                <h3 className="font-semibold text-gray-900 mb-4">Desglose por Categoría</h3>
                 <div className="space-y-3">
                   {categoryStats.map((cat) => (
                     <div key={cat.value}>
@@ -626,7 +626,7 @@ export const AdminPanel: React.FC = () => {
                           <span className="text-sm font-medium text-gray-700">{cat.label}</span>
                         </div>
                         <div className="flex items-center gap-4 text-sm">
-                          <span className="text-gray-500">{cat.count} vehÃ­culos</span>
+                          <span className="text-gray-500">{cat.count} vehículos</span>
                           <span className="font-semibold text-gray-900">${cat.revenue.toFixed(2)}</span>
                         </div>
                       </div>
@@ -643,7 +643,7 @@ export const AdminPanel: React.FC = () => {
 
               {/* Recent Completed Exits */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3">Ãšltimas Salidas del DÃ­a</h3>
+                <h3 className="font-semibold text-gray-900 mb-3">Últimas Salidas del Día</h3>
                 {completedToday.length === 0 ? (
                   <p className="text-sm text-gray-400">No hay salidas registradas hoy</p>
                 ) : (

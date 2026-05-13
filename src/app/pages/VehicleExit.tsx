@@ -14,7 +14,6 @@ import {
   Clock,
   Calendar,
   Camera,
-  Gift,
   Banknote,
   CreditCard,
   Search,
@@ -190,7 +189,6 @@ export const VehicleExit: React.FC = () => {
   const duration = getCurrentDuration();
   const amount = getAmount();
   const sub = getSubscriber();
-  const freeExit = false;
   const monthlyFree = isActiveMonthlySubscriber();
 
   const activeVehicles = vehicles.filter((v) => !v.exitTime);
@@ -422,15 +420,7 @@ export const VehicleExit: React.FC = () => {
                   </div>
 
                   {/* Amount */}
-                  {freeExit ? (
-                    <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 text-center">
-                      <Gift className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                      <div className="font-bold text-blue-800 text-lg mb-1">Salida Sin Cargo</div>
-                      <p className="text-sm text-blue-600">
-                        Estadía menor a 5 minutos — no se cobra
-                      </p>
-                    </div>
-                  ) : monthlyFree ? (
+                  {monthlyFree ? (
                     <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-5 text-center">
                       <Star className="w-8 h-8 text-amber-500 fill-amber-400 mx-auto mb-2" />
                       <div className="font-bold text-amber-800 text-lg mb-1">Abonado Mensual</div>

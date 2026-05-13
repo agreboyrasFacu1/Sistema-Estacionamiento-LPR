@@ -41,7 +41,7 @@ export const Search: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="font-bold text-gray-900">Detalles del VehÃ­culo</h2>
+              <h2 className="font-bold text-gray-900">Detalles del Vehículo</h2>
               <button onClick={() => setSelectedVehicle(null)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -68,7 +68,7 @@ export const Search: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-amber-800">{sub.name}</p>
                       <p className="text-xs text-amber-600">
-                        {sub.type === 'monthly' ? 'Abonado mensual' : `${sub.discount}% descuento`} Â· {sub.status === 'active' ? 'Activo' : 'Inactivo'}
+                        {sub.type === 'monthly' ? 'Abonado mensual' : `${sub.discount}% descuento`} · {sub.status === 'active' ? 'Activo' : 'Inactivo'}
                       </p>
                     </div>
                   </div>
@@ -99,7 +99,7 @@ export const Search: React.FC = () => {
                   </div>
                 ) : (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                    <div className="text-xs font-medium text-blue-600 mb-1">DuraciÃ³n actual</div>
+                    <div className="text-xs font-medium text-blue-600 mb-1">Duración actual</div>
                     <div className="text-sm font-semibold text-blue-800">
                       {formatDuration(Math.round((Date.now() - new Date(selectedVehicle.entryTime).getTime()) / (1000 * 60)))}
                     </div>
@@ -108,7 +108,7 @@ export const Search: React.FC = () => {
 
                 {selectedVehicle.duration && (
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                    <div className="text-xs font-medium text-gray-500 mb-1">DuraciÃ³n total</div>
+                    <div className="text-xs font-medium text-gray-500 mb-1">Duración total</div>
                     <div className="text-sm font-semibold text-gray-900">{formatDuration(selectedVehicle.duration)}</div>
                   </div>
                 )}
@@ -146,7 +146,7 @@ export const Search: React.FC = () => {
               {selectedVehicle.hasError && (
                 <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                  <p className="text-sm text-red-800">{selectedVehicle.errorMessage || 'Error detectado en este vehÃ­culo'}</p>
+                  <p className="text-sm text-red-800">{selectedVehicle.errorMessage || 'Error detectado en este vehículo'}</p>
                 </div>
               )}
 
@@ -171,8 +171,8 @@ export const Search: React.FC = () => {
 
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">BÃºsqueda de VehÃ­culos</h1>
-        <p className="text-gray-500">Buscar y consultar historial de vehÃ­culos</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Búsqueda de Vehículos</h1>
+        <p className="text-gray-500">Buscar y consultar historial de vehículos</p>
       </div>
 
       {/* Search Bar */}
@@ -200,7 +200,7 @@ export const Search: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between p-5 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">
-              VehÃ­culos Activos{' '}
+              Vehículos Activos{' '}
               <span className="text-gray-400 font-normal">({activeVehicles.length})</span>
             </h2>
             <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">Estacionados ahora</span>
@@ -209,7 +209,7 @@ export const Search: React.FC = () => {
           {activeVehicles.length === 0 ? (
             <div className="text-center py-10 text-gray-400">
               <Car className="w-10 h-10 mx-auto mb-2 text-gray-200" />
-              <p className="text-sm">No hay vehÃ­culos activos</p>
+              <p className="text-sm">No hay vehículos activos</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -217,9 +217,9 @@ export const Search: React.FC = () => {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Patente</th>
-                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">CategorÃ­a</th>
+                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Categoría</th>
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Entrada</th>
-                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">DuraciÃ³n</th>
+                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Duración</th>
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide"></th>
                   </tr>
@@ -256,7 +256,7 @@ export const Search: React.FC = () => {
                             onClick={() => setSelectedVehicle(vehicle)}
                             className="text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
                           >
-                            Ver â†’
+                            Ver →
                           </button>
                         </td>
                       </tr>
@@ -289,8 +289,8 @@ export const Search: React.FC = () => {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Patente</th>
-                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">CategorÃ­a</th>
-                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">DuraciÃ³n</th>
+                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Categoría</th>
+                    <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Duración</th>
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Monto</th>
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pago</th>
                     <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Salida</th>
@@ -332,7 +332,7 @@ export const Search: React.FC = () => {
                           onClick={() => setSelectedVehicle(vehicle)}
                           className="text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
                         >
-                          Ver â†’
+                          Ver →
                         </button>
                       </td>
                     </tr>

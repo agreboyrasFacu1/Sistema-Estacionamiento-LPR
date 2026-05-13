@@ -54,7 +54,7 @@ export const VehicleEntry: React.FC = () => {
   const validateCurrentPlate = (plate: string): string | null => {
     if (!plate) return null;
     if (!validatePlate(plate)) {
-      return 'Formato de patente invÃ¡lido. Use ABC123 o AB123CD';
+      return 'Formato de patente inválido. Use ABC123 o AB123CD';
     }
     if (checkDuplicatePlate(plate)) {
       return 'Patente ya registrada dentro del estacionamiento';
@@ -87,7 +87,7 @@ export const VehicleEntry: React.FC = () => {
       setPlateError(err);
     } else {
       setPlateError(null);
-      toast.success(`Patente ${plate} detectada por cÃ¡mara`);
+      toast.success(`Patente ${plate} detectada por cámara`);
     }
   };
 
@@ -130,9 +130,9 @@ export const VehicleEntry: React.FC = () => {
   const activePlate = getActivePlate();
   const subscriber = activePlate ? getSubscriberByPlate(activePlate) : null;
   const scopedCategories: { value: VehicleCategory; label: string; icon: string }[] = [
-    { value: 'auto', label: 'Auto', icon: 'ðŸš—' },
-    { value: 'camioneta', label: 'Camioneta', icon: 'ðŸš™' },
-    { value: 'moto', label: 'Moto', icon: 'ðŸï¸' },
+    { value: 'auto', label: 'Auto', icon: '🚗' },
+    { value: 'camioneta', label: 'Camioneta', icon: '🚙' },
+    { value: 'moto', label: 'Moto', icon: '🏍️' },
   ];
 
 
@@ -143,23 +143,23 @@ export const VehicleEntry: React.FC = () => {
         isOpen={showCamera}
         onClose={() => setShowCamera(false)}
         onPlateDetected={handleCameraPlateDetected}
-        title="CÃ¡mara de Entrada"
+        title="Cámara de Entrada"
       />
 
       {/* Page Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            Ingreso de VehÃ­culo
+            Ingreso de Vehículo
           </h1>
-          <p className="text-gray-500">Registrar nuevo vehÃ­culo ingresando a la instalaciÃ³n</p>
+          <p className="text-gray-500">Registrar nuevo vehículo ingresando a la instalación</p>
         </div>
         <button
           onClick={() => setShowCamera(true)}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
         >
           <Camera className="w-5 h-5" />
-          Abrir CÃ¡mara
+          Abrir Cámara
         </button>
       </div>
 
@@ -170,8 +170,8 @@ export const VehicleEntry: React.FC = () => {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Â¡Ingreso Confirmado!</h2>
-            <p className="text-gray-500 mb-6">VehÃ­culo registrado exitosamente</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Ingreso Confirmado!</h2>
+            <p className="text-gray-500 mb-6">Vehículo registrado exitosamente</p>
 
             <div className="bg-gray-50 rounded-xl p-5 mb-6 border border-gray-200">
               <div className="text-3xl font-bold text-gray-900 font-mono mb-2">
@@ -200,19 +200,19 @@ export const VehicleEntry: React.FC = () => {
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-semibold text-gray-900">DetecciÃ³n de Patente</h2>
+              <h2 className="font-semibold text-gray-900">Detección de Patente</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowCamera(true)}
                   className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Abrir cÃ¡mara"
+                  title="Abrir cámara"
                 >
                   <Camera className="w-5 h-5" />
                 </button>
                 <button
                   onClick={handleNewDetection}
                   className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
-                  title="Nueva detecciÃ³n LPR"
+                  title="Nueva detección LPR"
                 >
                   <RefreshCw className="w-5 h-5" />
                 </button>
@@ -232,7 +232,7 @@ export const VehicleEntry: React.FC = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Camera className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-700">Detectada por CÃ¡mara</span>
+                    <span className="text-sm font-medium text-blue-700">Detectada por Cámara</span>
                   </div>
                   <CheckCircle className="w-5 h-5 text-blue-600" />
                 </div>
@@ -276,7 +276,7 @@ export const VehicleEntry: React.FC = () => {
                 </div>
                 {!currentDetection.isValid && (
                   <div className="mt-3 p-2.5 bg-amber-100 rounded-lg">
-                    <p className="text-xs text-amber-800">âš ï¸ Confianza baja â€” use cÃ¡mara o ingreso manual</p>
+                    <p className="text-xs text-amber-800">Confianza baja — use cámara o ingreso manual</p>
                   </div>
                 )}
               </div>
@@ -288,14 +288,14 @@ export const VehicleEntry: React.FC = () => {
                 <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <Car className="w-10 h-10 text-gray-300" />
                 </div>
-                <p className="text-gray-400 mb-4">Sin detecciÃ³n activa</p>
+                <p className="text-gray-400 mb-4">Sin detección activa</p>
                 <div className="flex justify-center gap-3">
                   <button
                     onClick={() => setShowCamera(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors"
                   >
                     <Camera className="w-4 h-4" />
-                    Abrir CÃ¡mara
+                    Abrir Cámara
                   </button>
                   <button
                     onClick={handleNewDetection}
@@ -338,7 +338,7 @@ export const VehicleEntry: React.FC = () => {
                     maxLength={7}
                   />
                   <p className="text-xs text-gray-400 mt-1.5 text-center">
-                    Formatos vÃ¡lidos: ABC123 Â· AB123CD
+                    Formatos válidos: ABC123 · AB123CD
                   </p>
                 </div>
               )}
@@ -352,7 +352,7 @@ export const VehicleEntry: React.FC = () => {
                   <p className="text-sm font-medium text-red-800">{plateError}</p>
                   {plateError.includes('ya registrada') && (
                     <p className="text-xs text-red-600 mt-1">
-                      El vehÃ­culo ya se encuentra dentro del estacionamiento. Verifique en BÃºsqueda o Salidas.
+                      El vehículo ya se encuentra dentro del estacionamiento. Verifique en Búsqueda o Salidas.
                     </p>
                   )}
                 </div>
@@ -368,10 +368,10 @@ export const VehicleEntry: React.FC = () => {
                 <span className="font-semibold">Abonado Registrado</span>
               </div>
               <p className="text-sm text-amber-700 mt-1">
-                <strong>{subscriber.name}</strong> Â·{' '}
+                <strong>{subscriber.name}</strong> ·{' '}
                 {subscriber.type === 'monthly'
-                  ? subscriber.status === 'active' ? 'âœ… Abono mensual activo â€” Sin cargo' : 'âš ï¸ Abono vencido'
-                  : `ðŸ·ï¸ ${subscriber.discount}% de descuento`}
+                  ? subscriber.status === 'active' ? 'Abono mensual activo — Sin cargo' : 'Abono vencido'
+                  : `${subscriber.discount}% de descuento`}
               </p>
             </div>
           )}
@@ -379,8 +379,8 @@ export const VehicleEntry: React.FC = () => {
           {isTrainingMode && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <div className="text-sm text-amber-800">
-                <div className="font-semibold mb-1">ðŸ’¡ Consejo de Entrenamiento</div>
-                <p>En producciÃ³n, el sistema detecta patentes automÃ¡ticamente. Use la cÃ¡mara o ingreso manual cuando la detecciÃ³n falle.</p>
+                <div className="font-semibold mb-1">Consejo de Entrenamiento</div>
+                <p>En producción, el sistema detecta patentes automáticamente. Use la cámara o ingreso manual cuando la detección falle.</p>
               </div>
             </div>
           )}
@@ -394,7 +394,7 @@ export const VehicleEntry: React.FC = () => {
             {/* License Plate Display */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                NÃºmero de Patente
+                Número de Patente
               </label>
               <div className={`rounded-xl p-5 text-center transition-all ${
                 activePlate && !plateError ? 'bg-gray-900' : 'bg-gray-100 border-2 border-dashed border-gray-300'
@@ -410,7 +410,7 @@ export const VehicleEntry: React.FC = () => {
             {/* Vehicle Category */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                CategorÃ­a del VehÃ­culo
+                Categoría del Vehículo
               </label>
               <div className="grid grid-cols-2 gap-2.5">
                 {scopedCategories.map((category) => (
@@ -462,7 +462,7 @@ export const VehicleEntry: React.FC = () => {
                 ) : (
                   <>
                     <AlertCircle className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                    <span className="text-sm font-medium text-gray-500">Detecte o ingrese una patente vÃ¡lida</span>
+                    <span className="text-sm font-medium text-gray-500">Detecte o ingrese una patente válida</span>
                   </>
                 )}
               </div>

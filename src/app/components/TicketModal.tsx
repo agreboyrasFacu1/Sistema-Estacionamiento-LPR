@@ -44,7 +44,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                 <h2 className="font-bold text-lg">
                   {isNoCharge ? 'Salida Sin Cargo' : 'Pago Completado'}
                 </h2>
-                <p className="text-green-100 text-sm">TransacciÃ³n exitosa</p>
+                <p className="text-green-100 text-sm">Transacción exitosa</p>
               </div>
             </div>
             <button
@@ -65,7 +65,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
             </div>
             <h3 className="font-bold text-gray-900 text-sm">ESTACIONAMIENTO CENTRAL</h3>
             <p className="text-xs text-gray-500">Control de Acceso Automatizado LPR</p>
-            <p className="text-xs text-gray-400 mt-1">Ticket NÂ° {ticketNumber}</p>
+            <p className="text-xs text-gray-400 mt-1">Ticket N° {ticketNumber}</p>
           </div>
 
           {/* Vehicle info */}
@@ -99,7 +99,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
             <div className="flex items-center justify-between py-2 border-b border-gray-100">
               <div className="flex items-center gap-2 text-gray-600">
                 <Car className="w-4 h-4 text-purple-500" />
-                <span className="text-sm">Tiempo de EstadÃ­a</span>
+                <span className="text-sm">Tiempo de Estadía</span>
               </div>
               <span className="text-sm font-semibold text-gray-900">
                 {formatDuration(vehicle.duration || 0)}
@@ -164,7 +164,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
               onClick={onNewTransaction}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-colors shadow-sm"
             >
-              Nueva TransacciÃ³n
+              Nueva Transacción
             </button>
           </div>
         </div>

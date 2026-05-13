@@ -27,7 +27,7 @@ export const ForgotPassword: React.FC = () => {
     setIsLoading(false);
 
     if (!users.some((user) => user.email.toLowerCase() === email.toLowerCase() && user.isActive)) {
-      setError('No encontramos una cuenta con ese correo electrÃ³nico.');
+      setError('No encontramos una cuenta con ese correo electrónico.');
       return;
     }
 
@@ -43,7 +43,7 @@ export const ForgotPassword: React.FC = () => {
 
     // Demo: any 6-digit code works
     if (code.length !== 6 || !/^\d{6}$/.test(code)) {
-      setError('CÃ³digo invÃ¡lido. Ingrese el cÃ³digo de 6 dÃ­gitos.');
+      setError('Código inválido. Ingrese el código de 6 dígitos.');
       return;
     }
 
@@ -55,11 +55,11 @@ export const ForgotPassword: React.FC = () => {
     setError('');
 
     if (newPassword.length < 6) {
-      setError('La contraseÃ±a debe tener al menos 6 caracteres.');
+      setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Las contraseÃ±as no coinciden.');
+      setError('Las contraseñas no coinciden.');
       return;
     }
 
@@ -90,9 +90,9 @@ export const ForgotPassword: React.FC = () => {
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <KeyRound className="w-8 h-8 text-blue-600" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Â¿OlvidÃ³ su contraseÃ±a?</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">¿Olvidó su contraseña?</h1>
               <p className="text-gray-500 text-sm">
-                Ingrese su correo electrÃ³nico y le enviaremos un cÃ³digo de recuperaciÃ³n
+                Ingrese su correo electrónico y le enviaremos un código de recuperación
               </p>
             </div>
 
@@ -106,7 +106,7 @@ export const ForgotPassword: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Correo ElectrÃ³nico
+                  Correo Electrónico
                 </label>
                 <input
                   type="email"
@@ -132,19 +132,19 @@ export const ForgotPassword: React.FC = () => {
                 ) : (
                   <>
                     <Mail className="w-4 h-4" />
-                    Enviar CÃ³digo de RecuperaciÃ³n
+                    Enviar Código de Recuperación
                   </>
                 )}
               </button>
             </form>
 
             <p className="text-center text-sm text-gray-500 mt-5">
-              Â¿RecordÃ³ su contraseÃ±a?{' '}
+              ¿Recordó su contraseña?{' '}
               <button
                 onClick={() => navigate('/')}
                 className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
               >
-                Iniciar sesiÃ³n
+                Iniciar sesión
               </button>
             </p>
           </div>
@@ -159,7 +159,7 @@ export const ForgotPassword: React.FC = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">Revise su correo</h1>
               <p className="text-gray-500 text-sm">
-                Enviamos un cÃ³digo de 6 dÃ­gitos a{' '}
+                Enviamos un código de 6 dígitos a{' '}
                 <span className="font-semibold text-gray-700">{email}</span>
               </p>
             </div>
@@ -174,7 +174,7 @@ export const ForgotPassword: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CÃ³digo de VerificaciÃ³n
+                  Código de Verificación
                 </label>
                 <input
                   type="text"
@@ -187,7 +187,7 @@ export const ForgotPassword: React.FC = () => {
                   disabled={isLoading}
                 />
                 <p className="text-xs text-gray-400 mt-2 text-center">
-                  Demo: ingrese cualquier 6 dÃ­gitos (ej: 123456)
+                  Demo: ingrese cualquier 6 dígitos (ej: 123456)
                 </p>
               </div>
 
@@ -202,7 +202,7 @@ export const ForgotPassword: React.FC = () => {
                     Verificando...
                   </>
                 ) : (
-                  'Verificar CÃ³digo'
+                  'Verificar Código'
                 )}
               </button>
             </form>
@@ -212,7 +212,7 @@ export const ForgotPassword: React.FC = () => {
                 onClick={() => { setError(''); setStep('email'); }}
                 className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
               >
-                Â¿No recibiÃ³ el correo? Reenviar
+                ¿No recibió el correo? Reenviar
               </button>
             </div>
           </div>
@@ -225,9 +225,9 @@ export const ForgotPassword: React.FC = () => {
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <KeyRound className="w-8 h-8 text-blue-600" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Nueva ContraseÃ±a</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Nueva Contraseña</h1>
               <p className="text-gray-500 text-sm">
-                Cree una contraseÃ±a segura para su cuenta
+                Cree una contraseña segura para su cuenta
               </p>
             </div>
 
@@ -241,7 +241,7 @@ export const ForgotPassword: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nueva ContraseÃ±a
+                  Nueva Contraseña
                 </label>
                 <div className="relative">
                   <input
@@ -249,7 +249,7 @@ export const ForgotPassword: React.FC = () => {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="MÃ­nimo 6 caracteres"
+                    placeholder="Mínimo 6 caracteres"
                     required
                     disabled={isLoading}
                   />
@@ -265,7 +265,7 @@ export const ForgotPassword: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Confirmar ContraseÃ±a
+                  Confirmar Contraseña
                 </label>
                 <div className="relative">
                   <input
@@ -273,7 +273,7 @@ export const ForgotPassword: React.FC = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Repita la contraseÃ±a"
+                    placeholder="Repita la contraseña"
                     required
                     disabled={isLoading}
                   />
@@ -303,7 +303,7 @@ export const ForgotPassword: React.FC = () => {
                     ))}
                   </div>
                   <p className="text-xs text-gray-400">
-                    {newPassword.length < 4 ? 'Muy dÃ©bil' : newPassword.length < 7 ? 'DÃ©bil' : newPassword.length < 10 ? 'Moderada' : 'Fuerte'}
+                    {newPassword.length < 4 ? 'Muy débil' : newPassword.length < 7 ? 'Débil' : newPassword.length < 10 ? 'Moderada' : 'Fuerte'}
                   </p>
                 </div>
               )}
@@ -319,7 +319,7 @@ export const ForgotPassword: React.FC = () => {
                     Guardando...
                   </>
                 ) : (
-                  'Establecer Nueva ContraseÃ±a'
+                  'Establecer Nueva Contraseña'
                 )}
               </button>
             </form>
@@ -332,15 +332,15 @@ export const ForgotPassword: React.FC = () => {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Â¡ContraseÃ±a Actualizada!</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">¡Contraseña Actualizada!</h1>
             <p className="text-gray-500 text-sm mb-8">
-              Su contraseÃ±a ha sido cambiada exitosamente. Ya puede iniciar sesiÃ³n con su nueva contraseÃ±a.
+              Su contraseña ha sido cambiada exitosamente. Ya puede iniciar sesión con su nueva contraseña.
             </p>
             <button
               onClick={() => navigate('/')}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
             >
-              Ir a Iniciar SesiÃ³n
+              Ir a Iniciar Sesión
             </button>
           </div>
         )}
