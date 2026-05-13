@@ -25,22 +25,45 @@ const CATEGORIES: { value: VehicleCategory; label: string; icon: string }[] = [
   { value: 'moto', label: 'Moto', icon: '🏍️' },
 ];
 
-const emptyRule: Omit<PricingRule, 'id'> = {
-  category: 'auto',
-  name: '',
-  basePrice: 5,
-  hourlyRate: 3,
-  dailyMax: 40,
-  fraction: 10,
-  baseMinutes: 60,
+const PRICING_DEFAULTS: Record<
+  VehicleCategory,
+  Pick<PricingRule, 'basePrice' | 'hourlyRate' | 'dailyMax' | 'fraction' | 'baseMinutes'>
+> = {
+  auto: {
+    basePrice: 5000,
+    hourlyRate: 3000,
+    dailyMax: 40000,
+    fraction: 10,
+    baseMinutes: 60,
+  },
+  camioneta: {
+    basePrice: 5000,
+    hourlyRate: 3000,
+    dailyMax: 40000,
+    fraction: 10,
+    baseMinutes: 60,
+  },
+  moto: {
+    basePrice: 3000,
+    hourlyRate: 1800,
+    dailyMax: 24000,
+    fraction: 10,
+    baseMinutes: 60,
+  },
 };
+
+const createEmptyRule = (category: VehicleCategory = 'auto'): Omit<PricingRule, 'id'> => ({
+  category,
+  name: '',
+  ...PRICING_DEFAULTS[category],
+});
 
 export const AdminPanel: React.FC = () => {
   const { logs, stats, vehicles, pricingRules, addPricingRule, updatePricingRule, deletePricingRule } = useParking();
   const [activeTab, setActiveTab] = useState<TabType>('pricing');
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
-  const [formData, setFormData] = useState<Omit<PricingRule, 'id'>>(emptyRule);
+  const [formData, setFormData] = useState<Omit<PricingRule, 'id'>>(createEmptyRule());
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [logFilter, setLogFilter] = useState<string>('all');
@@ -53,7 +76,7 @@ export const AdminPanel: React.FC = () => {
 
   const openAddModal = () => {
     setEditingRule(null);
-    setFormData(emptyRule);
+    setFormData(createEmptyRule());
     setShowModal(true);
   };
 
@@ -86,6 +109,14 @@ export const AdminPanel: React.FC = () => {
   const handleDelete = (id: string) => {
     deletePricingRule(id);
     setDeleteConfirm(null);
+  };
+
+  const handleCategoryChange = (category: VehicleCategory) => {
+    setFormData({
+      ...formData,
+      category,
+      ...(!editingRule ? PRICING_DEFAULTS[category] : {}),
+    });
   };
 
   const filteredLogs = logFilter === 'all' ? logs : logs.filter((l) => l.type === logFilter);
@@ -176,7 +207,7 @@ export const AdminPanel: React.FC = () => {
                     <button
                       key={cat.value}
                       type="button"
-                      onClick={() => setFormData({ ...formData, category: cat.value })}
+                      onClick={() => handleCategoryChange(cat.value)}
                       className={`p-3 rounded-xl border-2 text-center transition-all ${
                         formData.category === cat.value
                           ? 'border-blue-600 bg-blue-50'
@@ -208,7 +239,7 @@ export const AdminPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Precio Base ($)
+                    Precio Base (ARS)
                   </label>
                   <input
                     type="number"
@@ -221,7 +252,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Tarifa por Hora ($)
+                    Tarifa posterior por Hora (ARS)
                   </label>
                   <input
                     type="number"
@@ -237,7 +268,7 @@ export const AdminPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    MÃ¡ximo Diario ($)
+                    Máximo Diario (ARS)
                   </label>
                   <input
                     type="number"
