@@ -3,6 +3,8 @@ import { normalizePlate, validatePlate } from './plates';
 
 export interface LprProvider {
   detect: () => Promise<LPRDetection>;
+  detectFromFrame?: (frame: Blob | ImageData) => Promise<LPRDetection>;
+  listDevices?: () => Promise<MediaDeviceInfo[]>;
 }
 
 const SIMULATED_PLATES = [
@@ -46,6 +48,22 @@ export const forceSimulatedDetection = (): LPRDetection => {
     isValid: validatePlate(plate),
     source: 'simulated',
   };
+};
+
+export const webcamDemoLprProvider: LprProvider = {
+  async detect() {
+    return { ...forceSimulatedDetection(), source: 'camera' };
+  },
+  async detectFromFrame() {
+    return { ...forceSimulatedDetection(), source: 'camera' };
+  },
+  async listDevices() {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      return [];
+    }
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((device) => device.kind === 'videoinput');
+  },
 };
 
 export const calculateLprAccuracy = (
