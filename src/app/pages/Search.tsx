@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useParking } from '../contexts/ParkingContext';
 import { VehicleEntry } from '../types';
@@ -17,6 +17,7 @@ import {
   Gift,
 } from 'lucide-react';
 import { formatDuration, translateCategory, getCategoryIcon } from '../data/mockData';
+import { formatCurrencyARSWithCents } from '../utils/currency';
 
 export const Search: React.FC = () => {
   const { vehicles, getSubscriberByPlate } = useParking();
@@ -137,7 +138,7 @@ export const Search: React.FC = () => {
                   ) : (
                     <>
                       <div className="text-xs text-gray-500 mb-1">Monto pagado</div>
-                      <div className="text-3xl font-bold text-green-600">${selectedVehicle.amount?.toFixed(2)}</div>
+                      <div className="text-3xl font-bold text-green-600">{formatCurrencyARSWithCents(selectedVehicle.amount || 0)}</div>
                     </>
                   )}
                 </div>
@@ -313,7 +314,7 @@ export const Search: React.FC = () => {
                         {((vehicle.amount || 0) === 0) ? (
                           <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full">Sin cargo</span>
                         ) : (
-                          <span className="font-semibold text-green-600">${vehicle.amount?.toFixed(2)}</span>
+                          <span className="font-semibold text-green-600">{formatCurrencyARSWithCents(vehicle.amount || 0)}</span>
                         )}
                       </td>
                       <td className="py-3.5 px-5">

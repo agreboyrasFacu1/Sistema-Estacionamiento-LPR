@@ -1,7 +1,8 @@
-﻿import React from 'react';
+import React from 'react';
 import { X, Printer, CheckCircle, Car, Clock, DollarSign, CreditCard, Banknote, Gift } from 'lucide-react';
 import { VehicleEntry } from '../types';
 import { formatDuration, translateCategory, getCategoryIcon } from '../data/mockData';
+import { formatCurrencyARSWithCents } from '../utils/currency';
 
 interface TicketModalProps {
   isOpen: boolean;
@@ -140,7 +141,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                 <span className="text-sm font-medium">Monto Total Pagado</span>
               </div>
               <div className="text-4xl font-bold text-green-600">
-                ${(vehicle.amount || 0).toFixed(2)}
+                {formatCurrencyARSWithCents(vehicle.amount || 0)}
               </div>
             </div>
           )}

@@ -48,6 +48,7 @@ import {
 } from '../domain/lpr';
 import { calculateWhiteRunDifference } from '../domain/whiteRun';
 import { loadFromStorage, saveToStorage } from '../services/storage';
+import { formatCurrencyARSWithCents } from '../utils/currency';
 import { useAuth } from './AuthContext';
 
 interface ParkingContextType {
@@ -360,7 +361,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
 
     addLog(
       'payment',
-      `Vehiculo ${updatedVehicle.licensePlate} pago ticket interno ${ticketNumber} por $${charge.amount.toFixed(2)}`,
+      `Vehiculo ${updatedVehicle.licensePlate} pago ticket interno ${ticketNumber} por ${formatCurrencyARSWithCents(charge.amount)}`,
       vehicleId,
       {
         amount: charge.amount,

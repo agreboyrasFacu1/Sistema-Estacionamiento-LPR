@@ -16,6 +16,7 @@ import {
   Save,
   Info,
 } from 'lucide-react';
+import { formatCurrencyARS, formatCurrencyARSWithCents } from '../utils/currency';
 
 type TabType = 'pricing' | 'logs' | 'reports';
 
@@ -319,15 +320,15 @@ export const AdminPanel: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-blue-800">
                   <div>
-                    <div className="font-semibold">${formData.basePrice.toFixed(2)}</div>
+                    <div className="font-semibold">{formatCurrencyARSWithCents(formData.basePrice)}</div>
                     <div className="text-blue-600">1ª hora</div>
                   </div>
                   <div>
-                    <div className="font-semibold">${formData.hourlyRate.toFixed(2)}/h</div>
+                    <div className="font-semibold">{formatCurrencyARSWithCents(formData.hourlyRate)}/h</div>
                     <div className="text-blue-600">Hora posterior</div>
                   </div>
                   <div>
-                    <div className="font-semibold">${formData.dailyMax.toFixed(2)}</div>
+                    <div className="font-semibold">{formatCurrencyARSWithCents(formData.dailyMax)}</div>
                     <div className="text-blue-600">Máx. diario</div>
                   </div>
                 </div>
@@ -443,15 +444,15 @@ export const AdminPanel: React.FC = () => {
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-500">Precio base:</span>
-                            <span className="font-semibold text-gray-900">${rule.basePrice.toFixed(2)}</span>
+                            <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(rule.basePrice)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-500">Hora posterior:</span>
-                            <span className="font-semibold text-gray-900">${rule.hourlyRate.toFixed(2)}</span>
+                            <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(rule.hourlyRate)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-500">Máx. diario:</span>
-                            <span className="font-semibold text-gray-900">${rule.dailyMax.toFixed(2)}</span>
+                            <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(rule.dailyMax)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-500">Fracción:</span>
@@ -463,7 +464,7 @@ export const AdminPanel: React.FC = () => {
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <span>Tolerancia post-pago: 3 min</span>
                             <span className="text-blue-600 font-medium">
-                              Ej. 3h → ${(rule.basePrice + 2 * rule.hourlyRate).toFixed(2)}
+                              Ej. 3h: 1h base + 12 fracciones = {formatCurrencyARSWithCents(rule.basePrice + 2 * rule.hourlyRate)}
                             </span>
                           </div>
                         </div>
@@ -599,7 +600,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-4">
                   <div className="text-sm text-green-700 mb-1 font-medium">Ingresos Hoy</div>
-                  <div className="text-3xl font-bold text-green-900">${stats.todayRevenue.toFixed(0)}</div>
+                  <div className="text-3xl font-bold text-green-900">{formatCurrencyARS(stats.todayRevenue)}</div>
                   <div className="text-xs text-green-600 mt-0.5">recaudados</div>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4">
@@ -627,7 +628,7 @@ export const AdminPanel: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-4 text-sm">
                           <span className="text-gray-500">{cat.count} vehículos</span>
-                          <span className="font-semibold text-gray-900">${cat.revenue.toFixed(2)}</span>
+                          <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(cat.revenue)}</span>
                         </div>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -657,7 +658,7 @@ export const AdminPanel: React.FC = () => {
                         <div className="flex items-center gap-3 text-sm">
                           <span className="text-gray-500">{v.duration ? `${v.duration}min` : '-'}</span>
                           <span className={`font-semibold ${(v.amount || 0) === 0 ? 'text-blue-600' : 'text-green-600'}`}>
-                            {(v.amount || 0) === 0 ? 'Sin cargo' : `$${v.amount?.toFixed(2)}`}
+                            {(v.amount || 0) === 0 ? 'Sin cargo' : formatCurrencyARSWithCents(v.amount || 0)}
                           </span>
                           <span className="text-xs text-gray-400 capitalize">
                             {v.paymentMethod === 'cash' ? 'Efectivo' : v.paymentMethod === 'card' ? 'Tarjeta' : '-'}

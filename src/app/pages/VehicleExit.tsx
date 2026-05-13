@@ -28,6 +28,7 @@ import {
   isActiveMonthlySubscriber as hasActiveMonthlySubscription,
 } from '../domain/subscribers';
 import { calculateDurationMinutes } from '../domain/stays';
+import { formatCurrencyARSWithCents } from '../utils/currency';
 
 export const VehicleExit: React.FC = () => {
   const {
@@ -433,7 +434,7 @@ export const VehicleExit: React.FC = () => {
                         <DollarSign className="w-5 h-5 text-green-600" />
                       </div>
                       <div className="text-5xl font-bold text-green-600">
-                        ${amount.toFixed(2)}
+                        {formatCurrencyARSWithCents(amount)}
                       </div>
                       {sub && sub.type === 'discounted' && sub.discount && (
                         <div className="text-xs text-green-700 mt-1">
@@ -520,7 +521,7 @@ export const VehicleExit: React.FC = () => {
                   {/* Amount reminder */}
                   <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
                     <div className="text-xs text-gray-500 mb-1">Total a cobrar</div>
-                    <div className="text-3xl font-bold text-green-600">${amount.toFixed(2)}</div>
+                    <div className="text-3xl font-bold text-green-600">{formatCurrencyARSWithCents(amount)}</div>
                     <div className="text-xs text-gray-400 mt-1">{selectedVehicle.licensePlate} · {formatDuration(duration)}</div>
                   </div>
 
