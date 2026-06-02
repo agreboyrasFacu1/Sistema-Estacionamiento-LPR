@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParking } from '../contexts/ParkingContext';
 import { translateCategory } from '../data/mockData';
 import { PricingRule, VehicleCategory } from '../types';
+import { formatLprAccuracy, getLprAccuracySummary } from '../domain/lpr';
 import {
   DollarSign,
   FileText,
@@ -61,7 +62,7 @@ const createEmptyRule = (category: VehicleCategory = 'auto'): Omit<PricingRule, 
 });
 
 export const AdminPanel: React.FC = () => {
-  const { logs, stats, vehicles, pricingRules, addPricingRule, updatePricingRule, deletePricingRule } = useParking();
+  const { logs, stats, vehicles, pricingRules, lprCorrections, addPricingRule, updatePricingRule, deletePricingRule } = useParking();
   const [activeTab, setActiveTab] = useState<TabType>('pricing');
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
@@ -147,6 +148,17 @@ export const AdminPanel: React.FC = () => {
     return { ...cat, count, revenue };
   });
   const maxCount = Math.max(...categoryStats.map((c) => c.count), 1);
+  const lprSummary = getLprAccuracySummary(lprCorrections);
+  const lprStatusLabel = {
+    no_sample: 'Sin muestra suficiente',
+    below_target: 'Por debajo del objetivo',
+    target_met: 'Objetivo alcanzado en muestra registrada',
+  }[lprSummary.status];
+  const lprStatusClass = {
+    no_sample: 'bg-gray-100 text-gray-700 border-gray-200',
+    below_target: 'bg-amber-100 text-amber-800 border-amber-200',
+    target_met: 'bg-green-100 text-green-800 border-green-200',
+  }[lprSummary.status];
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -657,6 +669,55 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-5">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Calidad LPR demo</h3>
+                    <p className="text-sm text-gray-500">
+                      Basado en lecturas aceptadas y correcciones manuales registradas. No valida OCR productivo real.
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${lprStatusClass}`}>
+                    {lprStatusLabel}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="text-xs text-gray-500 mb-1">Muestra</div>
+                    <div className="text-2xl font-bold text-gray-900">{lprSummary.totalReadings}</div>
+                    <div className="text-xs text-gray-400">lecturas</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="text-xs text-gray-500 mb-1">Correctas</div>
+                    <div className="text-2xl font-bold text-green-700">{lprSummary.correctReadings}</div>
+                    <div className="text-xs text-gray-400">sin correccion</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="text-xs text-gray-500 mb-1">Correcciones</div>
+                    <div className="text-2xl font-bold text-amber-700">{lprSummary.manualCorrections}</div>
+                    <div className="text-xs text-gray-400">manuales</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="text-xs text-gray-500 mb-1">Accuracy</div>
+                    <div className="text-2xl font-bold text-blue-700">{formatLprAccuracy(lprSummary.accuracy)}</div>
+                    <div className="text-xs text-gray-400">registrada</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="text-xs text-gray-500 mb-1">Objetivo</div>
+                    <div className="text-2xl font-bold text-gray-900">{formatLprAccuracy(lprSummary.targetAccuracy)}</div>
+                    <div className="text-xs text-gray-400">academico</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">
+                    La fuente actual es webcam/mock de entrenamiento. La integracion con camara IP real queda preparada como contrato y pendiente de backend/hardware.
+                  </p>
                 </div>
               </div>
 
