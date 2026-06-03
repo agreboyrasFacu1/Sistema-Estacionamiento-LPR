@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParking } from '../contexts/ParkingContext';
 import { Subscriber, SubscriberType, SubscriberStatus } from '../types';
+import { findActiveSubscriberPlateConflict } from '../domain/subscribers';
 import {
   Star,
   Plus,
@@ -45,6 +46,17 @@ export const Subscribers: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
+  const buildSubscriberCandidate = (): Subscriber => ({
+    ...formData,
+    id: editingSub?.id || '__new__',
+    createdAt: editingSub?.createdAt || new Date().toISOString(),
+    licensePlate: formData.licensePlate.toUpperCase(),
+    additionalPlates: (formData.additionalPlates || []).map((p) => p.toUpperCase()),
+    expiryDate: formData.type === 'monthly' && formData.expiryDate
+      ? new Date(formData.expiryDate).toISOString()
+      : undefined,
+  });
+
   const validate = (): boolean => {
     const e: Record<string, string | undefined> = {};
     if (!formData.name.trim()) e.name = 'El nombre es requerido';
@@ -56,6 +68,15 @@ export const Subscribers: React.FC = () => {
     if (formData.type === 'monthly' && !formData.expiryDate) e.expiryDate = 'La fecha de vencimiento es requerida';
     if (formData.type === 'discounted' && (!formData.discount || formData.discount <= 0)) {
       e.discount = 'El descuento debe ser mayor a 0';
+    }
+    if (!e.licensePlate && !e.expiryDate) {
+      const conflict = findActiveSubscriberPlateConflict(
+        subscribers,
+        buildSubscriberCandidate()
+      );
+      if (conflict) {
+        e.licensePlate = `Ya existe un abono activo/vigente para la patente ${conflict.plate} (${conflict.subscriber.name})`;
+      }
     }
     setErrors(e);
     return Object.keys(e).length === 0;
