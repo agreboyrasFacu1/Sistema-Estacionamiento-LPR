@@ -57,7 +57,7 @@ La tarifa respeta primera hora base y fraccion posterior fija de 10 minutos. El 
 
 ## LPR demo con webcam local
 
-La camara local del navegador se usa solo para entrenamiento y presentaciones. El sistema muestra preview de video, permite capturar un frame, simula una lectura con confianza y permite corregir la patente antes de usarla. No es OCR productivo real y no acredita precision >=95%.
+La camara local del navegador muestra preview de video y ejecuta lectura automatica de patente. Si el proveedor ALPR esta configurado, se usa reconocimiento especifico de patentes; si no esta disponible, el sistema utiliza OCR local como respaldo y permite corregir la patente antes de usarla.
 
 ## Marcha blanca
 

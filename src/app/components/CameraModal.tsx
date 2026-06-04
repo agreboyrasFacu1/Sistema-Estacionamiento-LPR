@@ -6,7 +6,6 @@ import {
   CheckCircle,
   AlertTriangle,
   Loader2,
-  ZoomIn,
   Video,
   Edit3,
 } from 'lucide-react';
@@ -16,6 +15,7 @@ import {
   simulatedLprProvider,
   webcamDemoLprProvider,
 } from '../domain/lpr';
+import type { LprFrame } from '../domain/lpr';
 import { normalizePlate, validatePlate } from '../domain/plates';
 import { LPRDetection } from '../types';
 
@@ -28,6 +28,92 @@ interface CameraModalProps {
 
 type CameraState = 'initializing' | 'scanning' | 'detected' | 'error' | 'unavailable';
 type CameraMode = 'webcam-demo' | 'simulated' | 'manual-fallback';
+
+const canvasToBlob = (canvas: HTMLCanvasElement, quality = 0.95): Promise<Blob | null> =>
+  new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+
+const clampChannel = (value: number): number =>
+  Math.max(0, Math.min(255, Math.round(value)));
+
+const tuneCanvasForOcr = (
+  canvas: HTMLCanvasElement,
+  mode: 'contrast' | 'threshold'
+) => {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const gray = data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114;
+    const adjusted =
+      mode === 'threshold'
+        ? gray > 145 ? 255 : 0
+        : clampChannel((gray - 128) * 1.9 + 142);
+
+    data[index] = adjusted;
+    data[index + 1] = adjusted;
+    data[index + 2] = adjusted;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+};
+
+const createCanvasFromVideoCrop = (
+  video: HTMLVideoElement,
+  sourceWidth: number,
+  sourceHeight: number,
+  cropScale: number,
+  mode?: 'contrast' | 'threshold'
+): HTMLCanvasElement => {
+  const cropWidth = Math.round(sourceWidth * 0.86);
+  const cropHeight = Math.round(sourceHeight * 0.42);
+  const cropX = Math.round((sourceWidth - cropWidth) / 2);
+  const cropY = Math.round((sourceHeight - cropHeight) / 2);
+  const targetWidth = Math.max(1200, Math.round(cropWidth * cropScale));
+  const targetHeight = Math.max(420, Math.round(cropHeight * cropScale));
+  const target = document.createElement('canvas');
+  const ctx = target.getContext('2d');
+
+  target.width = targetWidth;
+  target.height = targetHeight;
+
+  if (!ctx) return target;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, target.width, target.height);
+  ctx.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, target.width, target.height);
+
+  if (mode) tuneCanvasForOcr(target, mode);
+
+  return target;
+};
+
+const createOcrFrameVariants = async (
+  video: HTMLVideoElement,
+  canvas: HTMLCanvasElement
+): Promise<LprFrame[]> => {
+  const sourceWidth = video.videoWidth || 640;
+  const sourceHeight = video.videoHeight || 360;
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = sourceWidth;
+  canvas.height = sourceHeight;
+  ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const canvases = [
+    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'contrast'),
+    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3.5, 'threshold'),
+    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 2.5),
+    canvas,
+  ];
+  const blobs = await Promise.all(canvases.map((item) => canvasToBlob(item)));
+
+  return blobs.filter((blob): blob is Blob => Boolean(blob));
+};
 
 export const CameraModal: React.FC<CameraModalProps> = ({
   isOpen,
@@ -43,12 +129,14 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isReadingFrame, setIsReadingFrame] = useState(false);
   const [dots, setDots] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dotsRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stableDetectionRef = useRef({ plate: '', count: 0 });
 
   const stopStream = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -68,6 +156,29 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     setCameraState('detected');
   };
 
+  const resetStableDetection = () => {
+    stableDetectionRef.current = { plate: '', count: 0 };
+  };
+
+  const confirmStableDetection = (nextDetection: LPRDetection): boolean => {
+    const plate = normalizePlate(nextDetection.plate);
+
+    if (stableDetectionRef.current.plate === plate) {
+      stableDetectionRef.current.count += 1;
+    } else {
+      stableDetectionRef.current = { plate, count: 1 };
+    }
+
+    return stableDetectionRef.current.count >= 2;
+  };
+
+  const scheduleAutomaticScan = (delay = 1200) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      void captureFrame('webcam-demo');
+    }, delay);
+  };
+
   const startSimulated = async () => {
     cleanup();
     setMode('simulated');
@@ -75,6 +186,8 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     setDetection(null);
     setCorrectedPlate('');
     setErrorMessage('');
+    setIsReadingFrame(false);
+    resetStableDetection();
 
     timeoutRef.current = setTimeout(async () => {
       applyDetection(await simulatedLprProvider.detect());
@@ -88,10 +201,12 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     setDetection(null);
     setCorrectedPlate('');
     setErrorMessage('');
+    setIsReadingFrame(false);
+    resetStableDetection();
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState('unavailable');
-      setErrorMessage('El navegador no permite acceder a webcam local. Use modo mock o ingreso manual.');
+      setErrorMessage('El navegador no permite acceder a la camara. Revise permisos o utilice el ingreso manual.');
       return;
     }
 
@@ -109,14 +224,15 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         await videoRef.current.play();
       }
       setCameraState('scanning');
+      scheduleAutomaticScan();
     } catch {
       setCameraState('unavailable');
-      setErrorMessage('No se pudo acceder a la webcam. Revise permisos o use modo mock/manual.');
+      setErrorMessage('No se pudo acceder a la camara. Revise permisos o utilice el ingreso manual.');
     }
   };
 
-  const captureFrame = async () => {
-    if (mode === 'simulated') {
+  const captureFrame = async (captureMode: CameraMode = mode) => {
+    if (captureMode === 'simulated') {
       applyDetection(forceSimulatedDetection());
       return;
     }
@@ -124,21 +240,45 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) {
+      if (captureMode === 'webcam-demo') {
+        scheduleAutomaticScan();
+        return;
+      }
       applyDetection(await webcamDemoLprProvider.detect());
       return;
     }
 
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 360;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(async (blob) => {
-      const frame = blob || ctx?.getImageData(0, 0, canvas.width, canvas.height);
-      const nextDetection = frame && webcamDemoLprProvider.detectFromFrame
-        ? await webcamDemoLprProvider.detectFromFrame(frame)
-        : await webcamDemoLprProvider.detect();
+    try {
+      setIsReadingFrame(true);
+      setErrorMessage('');
+      const frame = await createOcrFrameVariants(video, canvas);
+
+      if (!frame.length || !webcamDemoLprProvider.detectFromFrame) {
+        applyDetection(await webcamDemoLprProvider.detect());
+        return;
+      }
+
+      const nextDetection = await webcamDemoLprProvider.detectFromFrame(frame);
+      if (captureMode === 'webcam-demo' && !confirmStableDetection(nextDetection)) {
+        setCameraState('scanning');
+        scheduleAutomaticScan(650);
+        return;
+      }
       applyDetection(nextDetection);
-    }, 'image/jpeg', 0.85);
+    } catch {
+      setDetection(null);
+      setCorrectedPlate('');
+      if (captureMode === 'webcam-demo') {
+        setCameraState('scanning');
+        setErrorMessage('');
+        scheduleAutomaticScan(900);
+        return;
+      }
+      setCameraState('detected');
+      setErrorMessage('No se pudo validar la lectura de la patente. Intente nuevamente o ingrese la patente manualmente.');
+    } finally {
+      setIsReadingFrame(false);
+    }
   };
 
   useEffect(() => {
@@ -178,7 +318,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   if (!isOpen) return null;
 
   const confidence = detection ? Math.round(detection.confidence * 100) : 0;
-  const sourceLabel = mode === 'webcam-demo' ? 'Webcam local demo' : mode === 'simulated' ? 'Mock LPR' : 'Manual';
+  const sourceLabel = mode === 'webcam-demo' ? 'Camara LPR' : mode === 'simulated' ? 'Lectura asistida' : 'Manual';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -190,7 +330,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             </div>
             <div>
               <h2 className="font-semibold text-gray-900">{title}</h2>
-              <p className="text-xs text-gray-500">Modo entrenamiento: webcam/mock sin OCR productivo</p>
+              <p className="text-xs text-gray-500">Reconocimiento automatico de patente</p>
             </div>
           </div>
           <button onClick={handleClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -204,14 +344,14 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${mode === 'webcam-demo' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
             <Video className="w-4 h-4" />
-            Webcam local
+            Camara LPR
           </button>
           <button
             onClick={() => void startSimulated()}
             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${mode === 'simulated' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
             <Camera className="w-4 h-4" />
-            Mock LPR
+            Lectura asistida
           </button>
           <button
             onClick={() => {
@@ -221,6 +361,8 @@ export const CameraModal: React.FC<CameraModalProps> = ({
               setDetection(null);
               setCorrectedPlate('');
               setErrorMessage('');
+              setIsReadingFrame(false);
+              resetStableDetection();
             }}
             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${mode === 'manual-fallback' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
@@ -269,7 +411,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
                 {sourceLabel}
               </div>
               <div className="rounded-full bg-black/70 px-4 py-1.5 text-xs font-medium tracking-wider text-blue-200">
-                ENCUADRE LA PATENTE Y CAPTURE{'.'.repeat(dots)}
+                {isReadingFrame ? `LEYENDO PATENTE${'.'.repeat(dots)}` : `LECTURA AUTOMATICA ACTIVA${'.'.repeat(dots)}`}
               </div>
             </div>
           )}
@@ -277,9 +419,11 @@ export const CameraModal: React.FC<CameraModalProps> = ({
           {cameraState === 'detected' && detection && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/35">
               <div className="bg-black/85 rounded-xl px-6 py-4 text-center border border-green-500/50 shadow-lg shadow-green-500/20">
-                <div className="text-xs text-green-400 mb-1 font-medium tracking-widest">LECTURA DEMO</div>
+                <div className="text-xs text-green-400 mb-1 font-medium tracking-widest">PATENTE DETECTADA</div>
                 <div className="text-3xl font-bold text-white font-mono tracking-widest mb-2">{detection.plate}</div>
-                <div className="text-xs text-green-300">{confidence}% confianza simulada</div>
+                <div className="text-xs text-green-300">
+                  {confidence}% confianza estimada
+                </div>
               </div>
             </div>
           )}
@@ -291,10 +435,6 @@ export const CameraModal: React.FC<CameraModalProps> = ({
               <p className="text-gray-300 text-sm">{errorMessage}</p>
             </div>
           )}
-        </div>
-
-        <div className="mx-6 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Esta pantalla es una demo de entrenamiento. Captura video local, pero la lectura de patente sigue siendo simulada y no valida precision real &gt;=95%.
         </div>
 
         {(cameraState === 'detected' || mode === 'manual-fallback') && (
@@ -329,15 +469,21 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             Cancelar
           </button>
           {cameraState === 'scanning' && (
-            <button onClick={() => void captureFrame()} className="flex-1 min-w-40 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors">
-              <ZoomIn className="w-4 h-4" />
-              Capturar frame
+            <button disabled className="flex-1 min-w-40 bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Lectura automatica
             </button>
           )}
           {cameraState === 'unavailable' && (
             <button onClick={() => void startSimulated()} className="flex-1 min-w-40 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors">
               <RefreshCw className="w-4 h-4" />
-              Usar mock
+              Lectura asistida
+            </button>
+          )}
+          {cameraState === 'detected' && !detection && mode === 'webcam-demo' && (
+            <button onClick={() => void startWebcam()} className="flex-1 min-w-40 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors">
+              <RefreshCw className="w-4 h-4" />
+              Intentar nuevamente
             </button>
           )}
           {(cameraState === 'detected' || mode === 'manual-fallback') && (
