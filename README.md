@@ -13,7 +13,7 @@ El sistema fue refactorizado desde prototipo visual hacia un MVP frontend persis
 - Ticket interno persistente por operacion.
 - Formateo monetario centralizado para pesos argentinos (ARS).
 - Reset seguro de datos demo desde Administracion para limpiar localStorage del prefijo `parking-lpr`.
-- Simulador LPR con modo webcam local de entrenamiento, sin OCR productivo real.
+- Camara LPR con proveedor ALPR configurable y OCR local de respaldo.
 - Preparacion inicial para marcha blanca mediante incidencias y diferencias.
 
 ## Reglas de negocio vigentes
@@ -49,6 +49,18 @@ npm run build
 npm audit --audit-level=high
 ```
 
+## Configuracion LPR
+
+La camara intenta leer patentes con Plate Recognizer Snapshot si existe un token configurado. Cree un archivo `.env.local` a partir de `.env.example` y complete:
+
+```bash
+VITE_PLATE_RECOGNIZER_TOKEN=su_token
+VITE_PLATE_RECOGNIZER_ENDPOINT=https://api.platerecognizer.com/v1/plate-reader/
+VITE_PLATE_RECOGNIZER_REGIONS=ar
+```
+
+Si no hay token o el servicio no responde, el sistema mantiene OCR local como respaldo para no interrumpir el flujo operativo.
+
 ## Arquitectura
 
 - `src/app/domain`: reglas puras de pricing, estadias, patentes, abonados, tickets, permisos, LPR y marcha blanca.
@@ -78,7 +90,7 @@ Resultado: build correcto con Vite 6.4.2 y 0 vulnerabilidades altas reportadas p
 
 ## Modo demo y webcam local
 
-La camara LPR funciona en modo entrenamiento/demo. Puede usar webcam local del navegador para mostrar una patente impresa o desde un celular, capturar un frame y continuar con una lectura simulada/corregible. Esta fase no implementa OCR productivo real ni valida precision >=95%; ese objetivo queda pendiente para una integracion LPR real con dataset medido.
+La camara LPR puede usar Plate Recognizer Snapshot para reconocimiento especifico de patentes desde imagen. Cuando no hay token configurado, o ante fallos puntuales del servicio, se usa OCR local como respaldo y el cajero conserva la posibilidad de correccion manual.
 
 Si los datos locales quedan contaminados por pruebas anteriores, el administrador puede usar `Reset demo` desde Administracion. El reset solo borra claves del prefijo `parking-lpr` y recarga los seeds vigentes.
 

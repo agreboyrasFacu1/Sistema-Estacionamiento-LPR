@@ -3,6 +3,8 @@ import {
   TARGET_LPR_ACCURACY,
   calculateLprValidationResult,
   calculateLprAccuracy,
+  extractPlateCandidateFromText,
+  extractPlateFromPlateRecognizerResponse,
   formatLprAccuracy,
   forceSimulatedDetection,
   getLprAccuracySummary,
@@ -132,5 +134,46 @@ describe('lpr demo provider', () => {
 
     expect(validatePlate(detection.plate)).toBe(true);
     expect(detection.isValid).toBe(true);
+  });
+
+  it('extracts legacy and Mercosur plates from OCR text', () => {
+    expect(extractPlateCandidateFromText('PATENTE ABC123')).toBe('ABC123');
+    expect(extractPlateCandidateFromText('AB 123 CD')).toBe('AB123CD');
+  });
+
+  it('normalizes common OCR confusions by plate position', () => {
+    expect(extractPlateCandidateFromText('ABIZ3CD')).toBe('AB123CD');
+    expect(extractPlateCandidateFromText('A8C12S')).toBe('ABC125');
+    expect(extractPlateCandidateFromText('A67591H')).toBe('AG759LH');
+    expect(extractPlateCandidateFromText('AGT59LH')).toBe('AG759LH');
+  });
+
+  it('returns null when OCR text has no valid plate candidate', () => {
+    expect(extractPlateCandidateFromText('SIN VEHICULO')).toBeNull();
+  });
+
+  it('extracts the strongest valid plate from Plate Recognizer results', () => {
+    expect(
+      extractPlateFromPlateRecognizerResponse({
+        results: [
+          {
+            plate: 'ag759lh',
+            score: 0.87,
+            candidates: [
+              { plate: 'ag7591h', score: 0.91 },
+              { plate: 'xyz', score: 0.99 },
+            ],
+          },
+        ],
+      })
+    ).toEqual({ plate: 'AG759LH', confidence: 0.87 });
+  });
+
+  it('returns null when Plate Recognizer has no supported Argentine plate format', () => {
+    expect(
+      extractPlateFromPlateRecognizerResponse({
+        results: [{ plate: '12345', score: 0.93 }],
+      })
+    ).toBeNull();
   });
 });

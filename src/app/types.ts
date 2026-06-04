@@ -104,7 +104,7 @@ export interface LPRDetection {
   confidence: number;
   timestamp: string;
   isValid: boolean;
-  source: 'simulated' | 'camera' | 'manual' | 'ip-camera';
+  source: 'simulated' | 'camera' | 'manual' | 'ip-camera' | 'alpr-api';
 }
 
 export interface LPRCorrection {
