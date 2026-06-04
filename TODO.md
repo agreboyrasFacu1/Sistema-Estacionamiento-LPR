@@ -7,9 +7,10 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 ## Pendientes críticos/altos postergados
 
 ### Git y release
-- [ ] Confirmar integración contra `origin/main`.
-- [ ] Subir cambios mediante commits atómicos y trazables.
-- [ ] Evitar push directo sin revisión.
+- [x] Confirmar integración contra `origin/main`.
+- [x] Subir cambios mediante commits atómicos y trazables.
+- [x] Evitar push directo sin revisión.
+- [x] Corregir vulnerabilidad alta de `react-router` y validar `npm audit --audit-level=high` sin hallazgos.
 
 ### Reglas de negocio/UI
 - [ ] Verificar que no queden referencias a tiempo inicial sin cargo, banderas legacy de salida sin cargo, `tolerancia inicial` o conceptos equivalentes.
@@ -31,14 +32,15 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 - [x] Agregar modo webcam local demo con `getUserMedia`, preview, captura y deteccion simulada.
 - [x] Agregar correccion manual visible de patente detectada y registrar `LPRCorrection`.
 - [x] Documentar que P2.3 no implementa OCR productivo ni precision real >=95%.
-- [ ] Exponer métrica de accuracy/correcciones.
-- [ ] Preparar integración futura con cámara IP real.
-- [ ] Validar objetivo de precisión >= 95% con dataset o muestra controlada.
+- [x] Exponer métrica de accuracy/correcciones.
+- [x] Preparar integración futura con cámara IP real.
+- [x] Preparar cálculo de validación con muestra controlada.
+- [ ] Validar precisión productiva >=95% con OCR real y dataset reproducible.
 
 ### Tests
-- [ ] Agregar tests para `plates`.
-- [ ] Agregar tests para `permissions`.
-- [ ] Agregar tests para `tickets`.
+- [x] Agregar tests para `plates`.
+- [x] Agregar tests para `permissions`.
+- [x] Agregar tests para `tickets`.
 - [ ] Agregar tests para búsqueda por ticket.
 - [x] Agregar tests para LPR demo provider y accuracy de correcciones.
 - [x] Agregar tests de storage reset/versionado demo.
@@ -68,6 +70,8 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 ### Documentación
 - [ ] Alinear README, manual y plan con implementación real.
 - [x] Documentar procedimiento de reset demo y limitaciones de webcam LPR sin OCR real.
-- [ ] Documentar claramente que es demo, que es parcial y que queda fuera de alcance.
+- [x] Crear informe QA/LPR con alcance, validaciones, límites y rollback.
+- [x] Documentar claramente límites de la métrica LPR demo.
+- [x] Documentar claramente que es demo, que es parcial y que queda fuera de alcance.
 
 *Nota: Estos puntos provienen de la auditoría post-implementación y del Prompt para Codex — Corrección controlada de hallazgos críticos y altos post-implementación.*

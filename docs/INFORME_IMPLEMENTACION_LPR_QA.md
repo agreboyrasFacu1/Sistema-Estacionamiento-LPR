@@ -4,7 +4,7 @@
 - Modo: recuperacion de ejecucion interrumpida e implementacion controlada en `main`.
 - Objetivo: exponer metricas LPR demo, preparar calculo de muestra controlada, reforzar reglas de abonados y dejar trazabilidad QA.
 - Resultado: metricas visibles en Administracion > Reportes, reglas puras testeadas y cobertura de dominio ampliada.
-- Estado final: cambios preparados para commits atomicos y push normal a `origin/main`.
+- Estado final: cambios aplicados en commits atómicos y publicados en `origin/main`.
 
 ## 2. Alcance analizado
 - Componentes: dominio LPR, reportes administrativos, dominio de abonados y tests de dominio.
