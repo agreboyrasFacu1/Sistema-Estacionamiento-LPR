@@ -28,7 +28,9 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [showCamera, setShowCamera] = useState(false);
 
-  const activeVehicles = vehicles.filter((v) => !v.exitTime);
+  const activeVehicles = vehicles
+    .filter((v) => !v.exitTime)
+    .sort((a, b) => new Date(b.entryTime).getTime() - new Date(a.entryTime).getTime());
   const recentLogs = logs.slice(0, 6);
 
   const handleCameraPlateDetected = (plate: string) => {

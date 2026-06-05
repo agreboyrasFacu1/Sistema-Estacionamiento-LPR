@@ -1,4 +1,4 @@
-import { User, VehicleEntry, PricingRule, SystemLog, Subscriber } from '../types';
+import { User, VehicleEntry, PricingRule, SystemLog, Subscriber, SubscriberPricingRule } from '../types';
 
 export const MOCK_USERS: User[] = [
   {
@@ -64,6 +64,31 @@ export const PRICING_RULES: PricingRule[] = [
     fractionRate: 500,
     fraction: 10,
     maxFractions: 5,
+  },
+];
+
+// Subscriber pricing rules — monthly subscription prices per vehicle category
+export const SUBSCRIBER_PRICING_RULES: SubscriberPricingRule[] = [
+  {
+    id: '1',
+    category: 'car',
+    name: 'Abono Mensual - Automóvil',
+    monthlyPrice: 150000,
+    discountedBasePrice: 5000,
+  },
+  {
+    id: '2',
+    category: 'motorcycle',
+    name: 'Abono Mensual - Motocicleta',
+    monthlyPrice: 100000,
+    discountedBasePrice: 3000,
+  },
+  {
+    id: '3',
+    category: 'van',
+    name: 'Abono Mensual - Camioneta/SUV',
+    monthlyPrice: 150000,
+    discountedBasePrice: 5000,
   },
 ];
 

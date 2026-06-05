@@ -44,6 +44,14 @@ export interface PricingRule {
   maxFractions: number; // max fractions before new hour is charged (5)
 }
 
+export interface SubscriberPricingRule {
+  id: string;
+  category: VehicleCategory;
+  name: string;
+  monthlyPrice: number; // monthly subscription price
+  discountedBasePrice?: number; // optional base price for discounted subscribers
+}
+
 export interface Subscriber {
   id: string;
   name: string;

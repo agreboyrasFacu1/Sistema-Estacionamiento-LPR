@@ -13,6 +13,7 @@ import {
   PricingRule,
   Subscriber,
   PaymentMethod,
+  SubscriberPricingRule,
 } from '../types';
 import {
   MOCK_VEHICLES,
@@ -20,6 +21,7 @@ import {
   MOCK_SUBSCRIBERS,
   SIMULATED_PLATES,
   PRICING_RULES,
+  SUBSCRIBER_PRICING_RULES,
   calculateParkingFee,
   getEffectiveSubscriberStatus,
 } from '../data/mockData';
@@ -31,6 +33,7 @@ interface ParkingContextType {
   currentDetection: LPRDetection | null;
   stats: DashboardStats;
   pricingRules: PricingRule[];
+  subscriberPricingRules: SubscriberPricingRule[];
   subscribers: Subscriber[];
   simulateDetection: () => void;
   addVehicleEntry: (plate: string, category: VehicleCategory) => Promise<VehicleEntry>;
@@ -39,6 +42,7 @@ interface ParkingContextType {
   checkDuplicatePlate: (plate: string) => boolean;
   addLog: (type: SystemLog['type'], message: string, vehicleId?: string) => void;
   updatePricingRule: (rule: PricingRule) => void;
+  updateSubscriberPricingRule: (rule: SubscriberPricingRule) => void;
   addSubscriber: (subscriber: Omit<Subscriber, 'id' | 'createdAt'>) => void;
   updateSubscriber: (subscriber: Subscriber) => void;
   deleteSubscriber: (id: string) => void;
@@ -54,6 +58,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [logs, setLogs] = useState<SystemLog[]>(MOCK_LOGS);
   const [currentDetection, setCurrentDetection] = useState<LPRDetection | null>(null);
   const [pricingRules, setPricingRules] = useState<PricingRule[]>(PRICING_RULES);
+  const [subscriberPricingRules, setSubscriberPricingRules] = useState<SubscriberPricingRule[]>(SUBSCRIBER_PRICING_RULES);
   const [subscribers, setSubscribers] = useState<Subscriber[]>(MOCK_SUBSCRIBERS);
 
   const stats: DashboardStats = {
@@ -214,6 +219,10 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const updatePricingRule = (rule: PricingRule) =>
     setPricingRules((prev) => prev.map((r) => (r.id === rule.id ? rule : r)));
 
+  // Subscriber pricing — only update, no add/delete
+  const updateSubscriberPricingRule = (rule: SubscriberPricingRule) =>
+    setSubscriberPricingRules((prev) => prev.map((r) => (r.id === rule.id ? rule : r)));
+
   // Subscriber CRUD
   const addSubscriber = (subscriber: Omit<Subscriber, 'id' | 'createdAt'>) => {
     const newSubscriber: Subscriber = {
@@ -238,6 +247,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
         currentDetection,
         stats,
         pricingRules,
+        subscriberPricingRules,
         subscribers,
         simulateDetection,
         addVehicleEntry,
@@ -246,6 +256,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
         checkDuplicatePlate,
         addLog,
         updatePricingRule,
+        updateSubscriberPricingRule,
         addSubscriber,
         updateSubscriber,
         deleteSubscriber,

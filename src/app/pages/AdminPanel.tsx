@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParking } from '../contexts/ParkingContext';
 import { translateCategory, formatCurrency } from '../data/mockData';
-import { PricingRule, VehicleCategory } from '../types';
+import { PricingRule, VehicleCategory, SubscriberPricingRule } from '../types';
 import {
   DollarSign,
   FileText,
@@ -13,9 +13,10 @@ import {
   XCircle,
   Save,
   Info,
+  Star,
 } from 'lucide-react';
 
-type TabType = 'pricing' | 'logs' | 'reports';
+type TabType = 'pricing' | 'subscriber-pricing' | 'logs' | 'reports';
 
 const CATEGORIES: { value: VehicleCategory; label: string; icon: string }[] = [
   { value: 'car', label: 'Automóvil', icon: '🚗' },
@@ -24,29 +25,45 @@ const CATEGORIES: { value: VehicleCategory; label: string; icon: string }[] = [
 ];
 
 export const AdminPanel: React.FC = () => {
-  const { logs, stats, vehicles, pricingRules, updatePricingRule } = useParking();
+  const { logs, stats, vehicles, pricingRules, updatePricingRule, subscriberPricingRules, updateSubscriberPricingRule } = useParking();
   const [activeTab, setActiveTab] = useState<TabType>('pricing');
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
+  const [editingSubscriberRule, setEditingSubscriberRule] = useState<SubscriberPricingRule | null>(null);
   const [formData, setFormData] = useState<Partial<PricingRule>>({});
+  const [subscriberFormData, setSubscriberFormData] = useState<Partial<SubscriberPricingRule>>({});
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [logFilter, setLogFilter] = useState<string>('all');
 
   const tabs = [
-    { id: 'pricing', label: 'Precios', icon: DollarSign },
+    { id: 'pricing', label: 'Precios Vehículos', icon: DollarSign },
+    { id: 'subscriber-pricing', label: 'Tarifas de Abonos', icon: Star },
     { id: 'logs', label: 'Registros', icon: FileText },
     { id: 'reports', label: 'Reportes', icon: BarChart3 },
   ];
 
   const openEditModal = (rule: PricingRule) => {
     setEditingRule(rule);
+    setEditingSubscriberRule(null);
     setFormData({ ...rule });
     setShowModal(true);
   };
 
+  const openEditSubscriberModal = (rule: SubscriberPricingRule) => {
+    setEditingSubscriberRule(rule);
+    setEditingRule(null);
+    setSubscriberFormData({ ...rule });
+    setShowModal(true);
+  };
+
   const handleSave = () => {
-    if (!editingRule || !formData.basePrice || !formData.fractionRate) return;
-    updatePricingRule({ ...editingRule, ...formData } as PricingRule);
+    if (editingRule && !editingSubscriberRule) {
+      if (!formData.basePrice || !formData.fractionRate) return;
+      updatePricingRule({ ...editingRule, ...formData } as PricingRule);
+    } else if (editingSubscriberRule && !editingRule) {
+      if (!subscriberFormData.monthlyPrice) return;
+      updateSubscriberPricingRule({ ...editingSubscriberRule, ...subscriberFormData } as SubscriberPricingRule);
+    }
     setShowModal(false);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
@@ -83,96 +100,188 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {/* Edit Pricing Modal */}
-      {showModal && editingRule && (
+      {showModal && (editingRule || editingSubscriberRule) && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="font-bold text-gray-900">Editar Tarifa — {editingRule.name}</h2>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            {/* Modal para Tarifas de Vehículos */}
+            {editingRule && !editingSubscriberRule && (
+              <>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                  <h2 className="font-bold text-gray-900">Editar Tarifa — {editingRule.name}</h2>
+                  <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
-            <div className="p-6 space-y-5">
-              {/* Category badge (read-only) */}
-              <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200">
-                <span className="text-2xl">{CATEGORIES.find((c) => c.value === editingRule.category)?.icon}</span>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">{editingRule.name}</div>
-                  <div className="text-xs text-gray-500">Categoría: {translateCategory(editingRule.category)}</div>
-                </div>
-              </div>
+                <div className="p-6 space-y-5">
+                  {/* Category badge (read-only) */}
+                  <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <span className="text-2xl">{CATEGORIES.find((c) => c.value === editingRule.category)?.icon}</span>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{editingRule.name}</div>
+                      <div className="text-xs text-gray-500">Categoría: {translateCategory(editingRule.category)}</div>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Precio primera hora (ARS $)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="100"
-                    value={formData.basePrice ?? ''}
-                    onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Por fracción de 10 min (ARS $)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="50"
-                    value={formData.fractionRate ?? ''}
-                    onChange={(e) => setFormData({ ...formData, fractionRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Precio primera hora (ARS $)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={formData.basePrice ?? ''}
+                        onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Por fracción de 10 min (ARS $)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        value={formData.fractionRate ?? ''}
+                        onChange={(e) => setFormData({ ...formData, fractionRate: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
 
-              {/* Preview */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-blue-700 mb-3">
-                  <Info className="w-4 h-4" />
-                  <span className="text-sm font-medium">Vista previa de cobro</span>
+                  {/* Preview */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-blue-700 mb-3">
+                      <Info className="w-4 h-4" />
+                      <span className="text-sm font-medium">Vista previa de cobro</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs text-blue-800">
+                      <div className="flex justify-between">
+                        <span>1ª hora (0–60 min)</span>
+                        <span className="font-semibold">{formatCurrency(formData.basePrice ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Fracción de 10 min (máx. 5)</span>
+                        <span className="font-semibold">{formatCurrency(formData.fractionRate ?? 0)} c/u</span>
+                      </div>
+                      <div className="flex justify-between border-t border-blue-200 pt-1.5 mt-1.5">
+                        <span>Máx. 1ª hora + 5 fracciones (110 min)</span>
+                        <span className="font-semibold">
+                          {formatCurrency((formData.basePrice ?? 0) + 5 * (formData.fractionRate ?? 0))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-blue-600">
+                        <span>Al exceder 5 fracciones → nueva hora base</span>
+                        <span className="font-semibold">{formatCurrency(2 * (formData.basePrice ?? 0))}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1.5 text-xs text-blue-800">
-                  <div className="flex justify-between">
-                    <span>1ª hora (0–60 min)</span>
-                    <span className="font-semibold">{formatCurrency(formData.basePrice ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Fracción de 10 min (máx. 5)</span>
-                    <span className="font-semibold">{formatCurrency(formData.fractionRate ?? 0)} c/u</span>
-                  </div>
-                  <div className="flex justify-between border-t border-blue-200 pt-1.5 mt-1.5">
-                    <span>Máx. 1ª hora + 5 fracciones (110 min)</span>
-                    <span className="font-semibold">
-                      {formatCurrency((formData.basePrice ?? 0) + 5 * (formData.fractionRate ?? 0))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-blue-600">
-                    <span>Al exceder 5 fracciones → nueva hora base</span>
-                    <span className="font-semibold">{formatCurrency(2 * (formData.basePrice ?? 0))}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
-              <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                Guardar Cambios
-              </button>
-            </div>
+                <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+                  <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    Guardar Cambios
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Modal para Tarifas de Abonos */}
+            {editingSubscriberRule && !editingRule && (
+              <>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                  <h2 className="font-bold text-gray-900">Editar Tarifa de Abono — {editingSubscriberRule.name}</h2>
+                  <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-5">
+                  {/* Category badge (read-only) */}
+                  <div className="flex items-center gap-3 bg-amber-50 rounded-xl p-3 border border-amber-200">
+                    <span className="text-2xl">{CATEGORIES.find((c) => c.value === editingSubscriberRule.category)?.icon}</span>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{editingSubscriberRule.name}</div>
+                      <div className="text-xs text-gray-500">Categoría: {translateCategory(editingSubscriberRule.category)}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Precio Abono Mensual (ARS $)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={subscriberFormData.monthlyPrice ?? ''}
+                        onChange={(e) => setSubscriberFormData({ ...subscriberFormData, monthlyPrice: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Precio mensual para abonados de renovación</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Precio Base Descuentos (ARS $) - Opcional
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={subscriberFormData.discountedBasePrice ?? ''}
+                        onChange={(e) => setSubscriberFormData({ ...subscriberFormData, discountedBasePrice: parseFloat(e.target.value) || undefined })}
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Tarifa base para abonados con descuento al % (vacío = usar tarifa normal)</p>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-amber-700 mb-3">
+                      <Info className="w-4 h-4" />
+                      <span className="text-sm font-medium">Resumen de tarifas</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs text-amber-800">
+                      <div className="flex justify-between">
+                        <span>Abono Mensual:</span>
+                        <span className="font-semibold">{formatCurrency(subscriberFormData.monthlyPrice ?? 0)}/mes</span>
+                      </div>
+                      {subscriberFormData.discountedBasePrice && (
+                        <div className="flex justify-between">
+                          <span>Base Descuentos:</span>
+                          <span className="font-semibold">{formatCurrency(subscriberFormData.discountedBasePrice)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+                  <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    Guardar Cambios
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -203,78 +312,145 @@ export const AdminPanel: React.FC = () => {
         </div>
 
         <div className="p-6">
-          {/* PRICING TAB */}
-          {activeTab === 'pricing' && (
-            <div>
-              <div className="mb-5">
-                <h2 className="font-semibold text-gray-900 mb-0.5">Configuración de Tarifas</h2>
-                <p className="text-sm text-gray-500">
-                  Modifique los valores de cada categoría. No se pueden agregar ni eliminar tarifas.
-                </p>
-              </div>
+           {/* PRICING TAB */}
+           {activeTab === 'pricing' && (
+             <div>
+               <div className="mb-5">
+                 <h2 className="font-semibold text-gray-900 mb-0.5">Configuración de Tarifas de Vehículos</h2>
+                 <p className="text-sm text-gray-500">
+                   Modifique los valores de cada categoría de vehículo. No se pueden agregar ni eliminar tarifas.
+                 </p>
+               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pricingRules.map((rule) => {
-                  const catInfo = CATEGORIES.find((c) => c.value === rule.category);
-                  const maxCharge = rule.basePrice + rule.maxFractions * rule.fractionRate;
-                  return (
-                    <div
-                      key={rule.id}
-                      className="bg-gray-50 border border-gray-200 rounded-xl p-5 hover:border-blue-200 hover:shadow-sm transition-all"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="text-2xl">{catInfo?.icon}</div>
-                          <div>
-                            <h3 className="font-semibold text-gray-900">{rule.name}</h3>
-                            <span className="text-xs text-gray-500">{translateCategory(rule.category)}</span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => openEditModal(rule)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Editar tarifa"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {pricingRules.map((rule) => {
+                   const catInfo = CATEGORIES.find((c) => c.value === rule.category);
+                   const maxCharge = rule.basePrice + rule.maxFractions * rule.fractionRate;
+                   return (
+                     <div
+                       key={rule.id}
+                       className="bg-gray-50 border border-gray-200 rounded-xl p-5 hover:border-blue-200 hover:shadow-sm transition-all"
+                     >
+                       <div className="flex items-start justify-between mb-4">
+                         <div className="flex items-center gap-2.5">
+                           <div className="text-2xl">{catInfo?.icon}</div>
+                           <div>
+                             <h3 className="font-semibold text-gray-900">{rule.name}</h3>
+                             <span className="text-xs text-gray-500">{translateCategory(rule.category)}</span>
+                           </div>
+                         </div>
+                         <button
+                           onClick={() => openEditModal(rule)}
+                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                           title="Editar tarifa"
+                         >
+                           <Edit className="w-4 h-4" />
+                         </button>
+                       </div>
 
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Primera hora:</span>
-                          <span className="font-semibold text-gray-900">{formatCurrency(rule.basePrice)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">c/10 min:</span>
-                          <span className="font-semibold text-gray-900">{formatCurrency(rule.fractionRate)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Máx. fracciones:</span>
-                          <span className="font-semibold text-gray-900">{rule.maxFractions} × {rule.fraction} min</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Tope 1ª hora:</span>
-                          <span className="font-semibold text-blue-700">{formatCurrency(maxCharge)}</span>
-                        </div>
-                      </div>
+                       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                         <div className="flex justify-between">
+                           <span className="text-gray-500">Primera hora:</span>
+                           <span className="font-semibold text-gray-900">{formatCurrency(rule.basePrice)}</span>
+                         </div>
+                         <div className="flex justify-between">
+                           <span className="text-gray-500">c/10 min:</span>
+                           <span className="font-semibold text-gray-900">{formatCurrency(rule.fractionRate)}</span>
+                         </div>
+                         <div className="flex justify-between">
+                           <span className="text-gray-500">Máx. fracciones:</span>
+                           <span className="font-semibold text-gray-900">{rule.maxFractions} × {rule.fraction} min</span>
+                         </div>
+                         <div className="flex justify-between">
+                           <span className="text-gray-500">Tope 1ª hora:</span>
+                           <span className="font-semibold text-blue-700">{formatCurrency(maxCharge)}</span>
+                         </div>
+                       </div>
 
-                      <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
-                        A los {60 + rule.maxFractions * rule.fraction} min → nueva hora base ({formatCurrency(rule.basePrice)})
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                       <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
+                         A los {60 + rule.maxFractions * rule.fraction} min → nueva hora base ({formatCurrency(rule.basePrice)})
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
 
-              <div className="mt-5 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1 text-xs text-blue-700">
-                  <p><span className="font-semibold">Regla de 5 minutos:</span> Los vehículos que salgan dentro de los primeros 5 min no son cobrados.</p>
-                  <p><span className="font-semibold">Regla de fracciones:</span> Máximo {pricingRules[0]?.maxFractions ?? 5} fracciones de {pricingRules[0]?.fraction ?? 10} min por hora. Al exceder, se cobra una nueva hora completa.</p>
-                </div>
-              </div>
-            </div>
-          )}
+               <div className="mt-5 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                 <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                 <div className="space-y-1 text-xs text-blue-700">
+                   <p><span className="font-semibold">Regla de 5 minutos:</span> Los vehículos que salgan dentro de los primeros 5 min no son cobrados.</p>
+                   <p><span className="font-semibold">Regla de fracciones:</span> Máximo {pricingRules[0]?.maxFractions ?? 5} fracciones de {pricingRules[0]?.fraction ?? 10} min por hora. Al exceder, se cobra una nueva hora completa.</p>
+                 </div>
+               </div>
+             </div>
+           )}
+
+           {/* SUBSCRIBER PRICING TAB */}
+           {activeTab === 'subscriber-pricing' && (
+             <div>
+               <div className="mb-5">
+                 <h2 className="font-semibold text-gray-900 mb-0.5">Configuración de Tarifas de Abonos</h2>
+                 <p className="text-sm text-gray-500">
+                   Modifique los precios mensuales y descuentos para cada categoría de vehículo. Solo administradores pueden modificar estas tarifas.
+                 </p>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {subscriberPricingRules.map((rule) => {
+                   const catInfo = CATEGORIES.find((c) => c.value === rule.category);
+                   return (
+                     <div
+                       key={rule.id}
+                       className="bg-amber-50 border border-amber-200 rounded-xl p-5 hover:border-amber-300 hover:shadow-sm transition-all"
+                     >
+                       <div className="flex items-start justify-between mb-4">
+                         <div className="flex items-center gap-2.5">
+                           <div className="text-2xl">{catInfo?.icon}</div>
+                           <div>
+                             <h3 className="font-semibold text-gray-900">{rule.name}</h3>
+                             <span className="text-xs text-gray-500">{translateCategory(rule.category)}</span>
+                           </div>
+                         </div>
+                         <button
+                           onClick={() => openEditSubscriberModal(rule)}
+                           className="p-2 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors"
+                           title="Editar tarifa de abono"
+                         >
+                           <Edit className="w-4 h-4" />
+                         </button>
+                       </div>
+
+                       <div className="space-y-2 text-sm">
+                         <div className="flex justify-between">
+                           <span className="text-gray-600">Abono Mensual:</span>
+                           <span className="font-semibold text-amber-900">{formatCurrency(rule.monthlyPrice)}/mes</span>
+                         </div>
+                         {rule.discountedBasePrice && (
+                           <div className="flex justify-between">
+                             <span className="text-gray-600">Base Descuentos:</span>
+                             <span className="font-semibold text-amber-900">{formatCurrency(rule.discountedBasePrice)}</span>
+                           </div>
+                         )}
+                       </div>
+
+                       <div className="mt-3 pt-3 border-t border-amber-200 text-xs text-gray-500">
+                         <Star className="w-3 h-3 inline mr-1 text-amber-600" />
+                         Aplica a abonados mensuales y con descuento
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+
+               <div className="mt-5 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                 <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                 <div className="space-y-1 text-xs text-amber-700">
+                   <p><span className="font-semibold">Abonos Mensuales:</span> Pago fijo mensual. Los abonados tienen acceso ilimitado sin cargos adicionales.</p>
+                   <p><span className="font-semibold">Tarifas Descuentos:</span> Se aplican cuando un abonado con descuento no tiene acceso gratuito. El precio base se reduce según su % de descuento.</p>
+                 </div>
+               </div>
+             </div>
+           )}
 
           {/* LOGS TAB */}
           {activeTab === 'logs' && (

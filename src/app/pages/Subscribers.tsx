@@ -696,134 +696,285 @@ export const Subscribers: React.FC = () => {
         </div>
       )}
 
-      {/* Filters + Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center gap-4 p-5 border-b border-gray-200 flex-wrap">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nombre, patente o email..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="all">Todos los tipos</option>
-            <option value="monthly">Mensual</option>
-            <option value="discounted">Bonificado</option>
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="all">Todos los estados</option>
-            <option value="active">Activos</option>
-            <option value="expired">Vencidos</option>
-            <option value="inactive">Inactivos</option>
-          </select>
-          <button onClick={openAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm ml-auto">
-            <Plus className="w-4 h-4" />
-            Nuevo Abonado
-          </button>
-        </div>
+         {/* Filters + Table */}
+       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+         <div className="flex items-center gap-4 p-5 border-b border-gray-200 flex-wrap">
+           <div className="relative flex-1 min-w-48">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+               placeholder="Buscar por nombre, patente o email..."
+               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+           </div>
+           <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)}
+             className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+             <option value="all">Todos los tipos</option>
+             <option value="monthly">Mensual</option>
+             <option value="discounted">Bonificado</option>
+           </select>
+           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}
+             className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+             <option value="all">Todos los estados</option>
+             <option value="active">Activos</option>
+             <option value="expired">Vencidos</option>
+             <option value="inactive">Inactivos</option>
+           </select>
+           <button onClick={openAddModal}
+             className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm ml-auto">
+             <Plus className="w-4 h-4" />
+             Nuevo Abonado
+           </button>
+         </div>
 
-        <div className="divide-y divide-gray-50">
-          {filteredSubs.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <Star className="w-10 h-10 mx-auto mb-3 text-gray-200" />
-              <p className="text-sm">No se encontraron abonados</p>
-            </div>
-          ) : (
-            filteredSubs.map((sub) => {
-              const days = daysUntilExpiry(sub);
-              const effStatus = getEffectiveSubscriberStatus(sub);
-              const isExpiringSoon = days !== null && days <= 7 && days > 0 && effStatus === 'active';
+         {filteredSubs.length === 0 ? (
+           <div className="text-center py-12 text-gray-400">
+             <Star className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+             <p className="text-sm">No se encontraron abonados</p>
+           </div>
+         ) : (
+           <div className="space-y-6 p-5">
+             {/* Active Subscribers Section */}
+             {(() => {
+               const activeSubs = filteredSubs.filter((s) => getEffectiveSubscriberStatus(s) === 'active');
+               return activeSubs.length > 0 ? (
+                 <div>
+                   <div className="flex items-center gap-2 mb-4">
+                     <CheckCircle className="w-5 h-5 text-green-600" />
+                     <h3 className="font-semibold text-gray-900">Abonados Activos ({activeSubs.length})</h3>
+                   </div>
+                   <div className="space-y-3 border-l-4 border-green-200 pl-5">
+                     {activeSubs.map((sub) => {
+                       const days = daysUntilExpiry(sub);
+                       const isExpiringSoon = days !== null && days <= 7 && days > 0;
 
-              return (
-                <div key={sub.id} className="p-5 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4 flex-1 min-w-0">
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 ${
-                        sub.type === 'monthly' ? 'bg-blue-600' : 'bg-amber-500'
-                      }`}>
-                        {sub.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-900">{sub.name}</span>
+                       return (
+                         <div key={sub.id} className="p-4 bg-green-50 border border-green-100 rounded-lg hover:bg-green-100 transition-colors">
+                           <div className="flex items-start justify-between">
+                             <div className="flex items-start gap-4 flex-1 min-w-0">
+                               <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 ${
+                                 sub.type === 'monthly' ? 'bg-blue-600' : 'bg-amber-500'
+                               }`}>
+                                 {sub.name.charAt(0)}
+                               </div>
+                               <div className="min-w-0">
+                                 <div className="flex items-center gap-2 flex-wrap">
+                                   <span className="font-semibold text-gray-900">{sub.name}</span>
+                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">✓ ACTIVO</span>
 
-                          {effStatus === 'active' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">● ACTIVO</span>
-                          )}
-                          {effStatus === 'expired' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">⚠ VENCIDO</span>
-                          )}
-                          {effStatus === 'inactive' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">● INACTIVO</span>
-                          )}
+                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                     sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                                   }`}>
+                                     {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
+                                   </span>
 
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
-                          </span>
+                                   {isExpiringSoon && (
+                                     <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                                       ⏰ Vence en {days}d
+                                     </span>
+                                   )}
+                                 </div>
 
-                          {isExpiringSoon && (
-                            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">
-                              ⏰ Vence en {days}d
-                            </span>
-                          )}
-                        </div>
+                                 <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
+                                   <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{sub.email}</div>
+                                   {sub.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{sub.phone}</div>}
+                                 </div>
 
-                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
-                          <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{sub.email}</div>
-                          {sub.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{sub.phone}</div>}
-                        </div>
+                                 <div className="flex items-center gap-2 mt-2">
+                                   <Car className="w-3.5 h-3.5 text-gray-400" />
+                                   <div className="flex gap-1.5 flex-wrap">
+                                     <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">{sub.licensePlate}</span>
+                                     {(sub.additionalPlates || []).map((p) => (
+                                       <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">{p}</span>
+                                     ))}
+                                   </div>
+                                 </div>
 
-                        <div className="flex items-center gap-2 mt-2">
-                          <Car className="w-3.5 h-3.5 text-gray-400" />
-                          <div className="flex gap-1.5 flex-wrap">
-                            <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">{sub.licensePlate}</span>
-                            {(sub.additionalPlates || []).map((p) => (
-                              <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">{p}</span>
-                            ))}
-                          </div>
-                        </div>
+                                 {sub.type === 'monthly' && sub.expiryDate && (
+                                   <p className="text-xs mt-1.5 text-gray-400">
+                                     Vencimiento: {new Date(sub.expiryDate).toLocaleDateString('es-CL')}
+                                   </p>
+                                 )}
+                                 {sub.notes && <p className="text-xs text-gray-400 mt-1 italic">"{sub.notes}"</p>}
+                               </div>
+                             </div>
 
-                        {sub.type === 'monthly' && sub.expiryDate && (
-                          <p className={`text-xs mt-1.5 ${effStatus === 'expired' ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
-                            {effStatus === 'expired' ? '⚠ Venció el ' : 'Vencimiento: '}
-                            {new Date(sub.expiryDate).toLocaleDateString('es-CL')}
-                            {effStatus === 'expired' && ' — Se aplica tarifa normal'}
-                          </p>
-                        )}
-                        {sub.notes && <p className="text-xs text-gray-400 mt-1 italic">"{sub.notes}"</p>}
-                      </div>
-                    </div>
+                             <div className="flex items-center gap-1 ml-4 flex-shrink-0">
+                               {sub.type === 'monthly' && (
+                                 <button
+                                   onClick={() => setPayingSubscriber(sub)}
+                                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                                   title="Cobrar abono"
+                                 >
+                                   <Receipt className="w-3.5 h-3.5" />
+                                   Pagar Abono
+                                 </button>
+                               )}
+                               <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                 <Edit className="w-4 h-4" />
+                               </button>
+                               <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                 <Trash2 className="w-4 h-4" />
+                               </button>
+                             </div>
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 </div>
+               ) : null;
+             })()}
 
-                    <div className="flex items-center gap-1 ml-4 flex-shrink-0">
-                      {sub.type === 'monthly' && (
-                        <button
-                          onClick={() => setPayingSubscriber(sub)}
-                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
-                          title="Cobrar abono"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          Pagar Abono
-                        </button>
-                      )}
-                      <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+             {/* Expired Subscribers Section */}
+             {(() => {
+               const expiredSubs = filteredSubs.filter((s) => getEffectiveSubscriberStatus(s) === 'expired');
+               return expiredSubs.length > 0 ? (
+                 <div>
+                   <div className="flex items-center gap-2 mb-4">
+                     <AlertTriangle className="w-5 h-5 text-red-600" />
+                     <h3 className="font-semibold text-gray-900">Abonados Vencidos ({expiredSubs.length})</h3>
+                   </div>
+                   <div className="space-y-3 border-l-4 border-red-200 pl-5">
+                     {expiredSubs.map((sub) => {
+                       return (
+                         <div key={sub.id} className="p-4 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors">
+                           <div className="flex items-start justify-between">
+                             <div className="flex items-start gap-4 flex-1 min-w-0">
+                               <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 ${
+                                 sub.type === 'monthly' ? 'bg-red-600' : 'bg-orange-500'
+                               }`}>
+                                 {sub.name.charAt(0)}
+                               </div>
+                               <div className="min-w-0">
+                                 <div className="flex items-center gap-2 flex-wrap">
+                                   <span className="font-semibold text-gray-900">{sub.name}</span>
+                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">⚠ VENCIDO</span>
+
+                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                     sub.type === 'monthly' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                                   }`}>
+                                     {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
+                                   </span>
+                                 </div>
+
+                                 <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
+                                   <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{sub.email}</div>
+                                   {sub.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{sub.phone}</div>}
+                                 </div>
+
+                                 <div className="flex items-center gap-2 mt-2">
+                                   <Car className="w-3.5 h-3.5 text-gray-400" />
+                                   <div className="flex gap-1.5 flex-wrap">
+                                     <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">{sub.licensePlate}</span>
+                                     {(sub.additionalPlates || []).map((p) => (
+                                       <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">{p}</span>
+                                     ))}
+                                   </div>
+                                 </div>
+
+                                 {sub.type === 'monthly' && sub.expiryDate && (
+                                   <p className="text-xs mt-1.5 text-red-600 font-medium">
+                                     ⚠ Venció el {new Date(sub.expiryDate).toLocaleDateString('es-CL')} — Se aplica tarifa normal
+                                   </p>
+                                 )}
+                                 {sub.notes && <p className="text-xs text-gray-400 mt-1 italic">"{sub.notes}"</p>}
+                               </div>
+                             </div>
+
+                             <div className="flex items-center gap-1 ml-4 flex-shrink-0">
+                               {sub.type === 'monthly' && (
+                                 <button
+                                   onClick={() => setPayingSubscriber(sub)}
+                                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                                   title="Cobrar abono para renovar"
+                                 >
+                                   <Receipt className="w-3.5 h-3.5" />
+                                   Renovar
+                                 </button>
+                               )}
+                               <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                 <Edit className="w-4 h-4" />
+                               </button>
+                               <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                 <Trash2 className="w-4 h-4" />
+                               </button>
+                             </div>
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 </div>
+               ) : null;
+             })()}
+
+             {/* Inactive Subscribers Section */}
+             {(() => {
+               const inactiveSubs = filteredSubs.filter((s) => getEffectiveSubscriberStatus(s) === 'inactive');
+               return inactiveSubs.length > 0 ? (
+                 <div>
+                   <div className="flex items-center gap-2 mb-4">
+                     <AlertCircle className="w-5 h-5 text-gray-400" />
+                     <h3 className="font-semibold text-gray-900">Abonados Inactivos ({inactiveSubs.length})</h3>
+                   </div>
+                   <div className="space-y-3 border-l-4 border-gray-200 pl-5">
+                     {inactiveSubs.map((sub) => {
+                       return (
+                         <div key={sub.id} className="p-4 bg-gray-50 border border-gray-100 rounded-lg hover:bg-gray-100 transition-colors">
+                           <div className="flex items-start justify-between">
+                             <div className="flex items-start gap-4 flex-1 min-w-0">
+                               <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 bg-gray-400">
+                                 {sub.name.charAt(0)}
+                               </div>
+                               <div className="min-w-0">
+                                 <div className="flex items-center gap-2 flex-wrap">
+                                   <span className="font-semibold text-gray-900">{sub.name}</span>
+                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">● INACTIVO</span>
+
+                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                     sub.type === 'monthly' ? 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-700'
+                                   }`}>
+                                     {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
+                                   </span>
+                                 </div>
+
+                                 <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
+                                   <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{sub.email}</div>
+                                   {sub.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{sub.phone}</div>}
+                                 </div>
+
+                                 <div className="flex items-center gap-2 mt-2">
+                                   <Car className="w-3.5 h-3.5 text-gray-400" />
+                                   <div className="flex gap-1.5 flex-wrap">
+                                     <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">{sub.licensePlate}</span>
+                                     {(sub.additionalPlates || []).map((p) => (
+                                       <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">{p}</span>
+                                     ))}
+                                   </div>
+                                 </div>
+
+                                 {sub.notes && <p className="text-xs text-gray-400 mt-1 italic">"{sub.notes}"</p>}
+                               </div>
+                             </div>
+
+                             <div className="flex items-center gap-1 ml-4 flex-shrink-0">
+                               <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                 <Edit className="w-4 h-4" />
+                               </button>
+                               <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                 <Trash2 className="w-4 h-4" />
+                               </button>
+                             </div>
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 </div>
+               ) : null;
+             })()}
+           </div>
+         )}
+       </div>
     </div>
   );
 };

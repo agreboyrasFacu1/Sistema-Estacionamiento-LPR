@@ -30,8 +30,10 @@ const LostTicketModal: React.FC<{
 
   const activeVehicles = vehicles.filter((v) => !v.exitTime);
   const filtered = query
-    ? activeVehicles.filter((v) => v.licensePlate.includes(query.toUpperCase()))
-    : activeVehicles;
+    ? activeVehicles
+        .filter((v) => v.licensePlate.includes(query.toUpperCase()))
+        .sort((a, b) => new Date(b.entryTime).getTime() - new Date(a.entryTime).getTime())
+    : activeVehicles.sort((a, b) => new Date(b.entryTime).getTime() - new Date(a.entryTime).getTime());
 
   const handlePrint = () => {
     window.print();
@@ -186,8 +188,12 @@ export const Search: React.FC = () => {
     (v) => searchTerm === '' || v.licensePlate.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const activeVehicles = filteredVehicles.filter((v) => !v.exitTime);
-  const exitedVehicles = filteredVehicles.filter((v) => v.exitTime);
+  const activeVehicles = filteredVehicles
+    .filter((v) => !v.exitTime)
+    .sort((a, b) => new Date(b.entryTime).getTime() - new Date(a.entryTime).getTime());
+  const exitedVehicles = filteredVehicles
+    .filter((v) => v.exitTime)
+    .sort((a, b) => new Date(b.exitTime).getTime() - new Date(a.exitTime).getTime());
 
   return (
     <div className="max-w-6xl mx-auto">

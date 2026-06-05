@@ -1,0 +1,30 @@
+<!-- ...existing code... -->
+<div>
+    <h2>Modificar Abono</h2>
+    <form id="modificarAbonoForm">
+        <label for="abonoId">ID del Abono:</label>
+        <input type="text" id="abonoId" name="abonoId" required>
+        
+        <label for="nuevoValor">Nuevo Valor:</label>
+        <input type="number" id="nuevoValor" name="nuevoValor" required>
+        
+        <button type="submit">Actualizar</button>
+    </form>
+</div>
+<script>
+    document.getElementById('modificarAbonoForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const abonoId = document.getElementById('abonoId').value;
+        const nuevoValor = document.getElementById('nuevoValor').value;
+
+        const response = await fetch('/api/abonos/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: abonoId, nuevoValor })
+        });
+
+        const result = await response.text();
+        alert(result);
+    });
+</script>
+<!-- ...existing code... -->

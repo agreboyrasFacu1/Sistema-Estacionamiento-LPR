@@ -182,13 +182,15 @@ export const VehicleExit: React.FC = () => {
     setCardAmount('');
   };
 
-  const duration = getCurrentDuration();
-  const amount = getAmount();
-  const sub = getSubscriber();
-  const freeExit = isFreeExit();
-  const monthlyFree = isActiveMonthlySubscriber();
+   const duration = getCurrentDuration();
+   const amount = getAmount();
+   const sub = getSubscriber();
+   const freeExit = isFreeExit();
+   const monthlyFree = isActiveMonthlySubscriber();
 
-  const activeVehicles = vehicles.filter((v) => !v.exitTime);
+   const activeVehicles = vehicles
+     .filter((v) => !v.exitTime)
+     .sort((a, b) => new Date(b.entryTime).getTime() - new Date(a.entryTime).getTime());
 
   return (
     <div className="max-w-5xl mx-auto">
