@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calculateSubscriberParkingAmount,
   findActiveSubscriberPlateConflict,
+  getEffectiveSubscriberStatus,
   getSubscriberByPlate,
   getSubscriberValidity,
   hasActiveSubscriberPlateConflict,
   isActiveMonthlySubscriber,
+  isSubscriberChargeExempt,
+  renewMonthlySubscriber,
+  shouldChargeAsRegularVehicle,
 } from './subscribers';
 import { Subscriber } from '../types';
 
@@ -41,9 +46,53 @@ describe('subscriber domain', () => {
   it('distinguishes active and expired monthly subscribers', () => {
     const now = new Date('2026-05-12T00:00:00.000Z');
     expect(getSubscriberValidity(subscribers[0], now)).toBe('active');
+    expect(getEffectiveSubscriberStatus(subscribers[0], now)).toBe('active');
     expect(getSubscriberValidity(subscribers[1], now)).toBe('expired');
     expect(isActiveMonthlySubscriber(subscribers[0], now)).toBe(true);
     expect(isActiveMonthlySubscriber(subscribers[1], now)).toBe(false);
+  });
+
+  it('exempts only active monthly subscribers from regular stay charges', () => {
+    const now = new Date('2026-05-12T00:00:00.000Z');
+    const inactiveMonthly: Subscriber = {
+      ...subscribers[0],
+      id: 'inactive',
+      status: 'inactive',
+    };
+
+    expect(isSubscriberChargeExempt(subscribers[0], now)).toBe(true);
+    expect(shouldChargeAsRegularVehicle(subscribers[0], now)).toBe(false);
+    expect(isSubscriberChargeExempt(subscribers[1], now)).toBe(false);
+    expect(shouldChargeAsRegularVehicle(subscribers[1], now)).toBe(true);
+    expect(isSubscriberChargeExempt(inactiveMonthly, now)).toBe(false);
+    expect(shouldChargeAsRegularVehicle(inactiveMonthly, now)).toBe(true);
+    expect(isSubscriberChargeExempt(undefined, now)).toBe(false);
+  });
+
+  it('calculates parking amount according to effective subscriber benefits', () => {
+    const now = new Date('2026-05-12T00:00:00.000Z');
+    const discountedActive: Subscriber = {
+      id: 'discount-active',
+      name: 'Bonificado',
+      email: 'bonificado@example.com',
+      phone: '',
+      licensePlate: 'BO123NO',
+      type: 'discounted',
+      status: 'active',
+      discount: 40,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    const discountedInactive: Subscriber = {
+      ...discountedActive,
+      id: 'discount-inactive',
+      status: 'inactive',
+    };
+
+    expect(calculateSubscriberParkingAmount(5000, subscribers[0], now)).toBe(0);
+    expect(calculateSubscriberParkingAmount(5000, subscribers[1], now)).toBe(5000);
+    expect(calculateSubscriberParkingAmount(5000, discountedActive, now)).toBe(3000);
+    expect(calculateSubscriberParkingAmount(5000, discountedInactive, now)).toBe(5000);
+    expect(calculateSubscriberParkingAmount(5000, undefined, now)).toBe(5000);
   });
 
   it('detects active subscriber plate conflicts with normalized plates', () => {
@@ -105,6 +154,34 @@ describe('subscriber domain', () => {
     expect(
       findActiveSubscriberPlateConflict([...subscribers, inactive], inactiveRenewal, now)
     ).toBeNull();
+  });
+
+  it('renews expired or inactive monthly subscribers from now', () => {
+    const now = new Date('2026-05-12T10:00:00.000Z');
+    const inactive: Subscriber = {
+      ...subscribers[0],
+      id: 'inactive-monthly',
+      status: 'inactive',
+    };
+
+    const expiredRenewal = renewMonthlySubscriber(subscribers[1], now);
+    const inactiveRenewal = renewMonthlySubscriber(inactive, now);
+
+    expect(expiredRenewal.validFrom).toBe(now.toISOString());
+    expect(expiredRenewal.subscriber.status).toBe('active');
+    expect(expiredRenewal.amount).toBe(150000);
+    expect(expiredRenewal.subscriber.expiryDate).toBe('2026-06-11T10:00:00.000Z');
+    expect(inactiveRenewal.validFrom).toBe(now.toISOString());
+    expect(inactiveRenewal.subscriber.expiryDate).toBe('2026-06-11T10:00:00.000Z');
+  });
+
+  it('renews active future monthly subscribers from their current expiry', () => {
+    const now = new Date('2026-05-12T10:00:00.000Z');
+    const renewal = renewMonthlySubscriber(subscribers[0], now);
+
+    expect(renewal.validFrom).toBe('2026-12-31T00:00:00.000Z');
+    expect(renewal.validUntil).toBe('2027-01-30T00:00:00.000Z');
+    expect(renewal.subscriber.expiryDate).toBe('2027-01-30T00:00:00.000Z');
   });
 
   it('detects conflicts against additional plates', () => {

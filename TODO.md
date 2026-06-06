@@ -14,6 +14,7 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 
 ### Reglas de negocio/UI
 - [ ] Verificar que no queden referencias a tiempo inicial sin cargo, banderas legacy de salida sin cargo, `tolerancia inicial` o conceptos equivalentes.
+- [x] Mantener prohibida la salida sin cargo por estadia corta o tolerancia inicial sin cargo.
 - [ ] Validar manualmente pricing: 60, 61, 70 y 71 minutos.
 - [ ] Verificar que no queden artefactos de encoding/mojibake en pantallas operativas, administracion o tickets.
 - [ ] Mantener montos ARS alineados en mock data, defaults de administracion y documentacion: Auto/Camioneta $5.000 + $500 cada 10 minutos; Moto $3.000 + $300 cada 10 minutos; abono mensual $150.000.
@@ -61,6 +62,9 @@ El proyecto se encuentra en estado `MVP frontend persistente / demo local`, no p
 - [ ] Agregar migraciones versionadas.
 - [ ] Definir backup/restore de base local.
 - [ ] Modelar facturacion real del abono mensual; hoy el MVP solo usa el estado de abonado activo para bypass operativo de cobro.
+- [x] Agregar renovacion demo de abonos mensuales con ticket interno no fiscal y persistencia local.
+- [x] Tratar abonados vencidos o inactivos como clientes comunes para el cobro de estadia.
+- [x] Agregar soporte demo de pago mixto con desglose persistido en ticket interno.
 
 ### Arquitectura
 - [ ] Reducir responsabilidades de `ParkingContext`.

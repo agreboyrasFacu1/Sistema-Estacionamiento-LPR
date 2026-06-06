@@ -19,11 +19,11 @@ import {
   Search,
   Star,
   AlertCircle,
-  XCircle,
 } from 'lucide-react';
 import { calculateParkingFee, formatDuration, translateCategory, getCategoryIcon } from '../data/mockData';
-import { PaymentMethod, VehicleEntry } from '../types';
+import { PaymentBreakdownItem, PaymentMethod, VehicleEntry } from '../types';
 import {
+  calculateSubscriberParkingAmount,
   getSubscriberValidity,
   isActiveMonthlySubscriber as hasActiveMonthlySubscription,
 } from '../domain/subscribers';
@@ -55,6 +55,8 @@ export const VehicleExit: React.FC = () => {
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
   const [showPaymentStep, setShowPaymentStep] = useState(false);
   const [paymentRegistered, setPaymentRegistered] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [cardAmount, setCardAmount] = useState('');
 
   useEffect(() => {
     void simulateDetection();
@@ -122,10 +124,31 @@ export const VehicleExit: React.FC = () => {
     if (isActiveMonthlySubscriber()) return 0;
     const sub = getSubscriber();
     const base = calculateParkingFee(selectedVehicle.category, getCurrentDuration(), pricingRules);
-    if (sub && getSubscriberValidity(sub) === 'active' && sub.type === 'discounted' && sub.discount) {
-      return base * (1 - sub.discount / 100);
+    return calculateSubscriberParkingAmount(base, sub || undefined);
+  };
+
+  const getMixedPaymentBreakdown = (): PaymentBreakdownItem[] => [
+    { method: 'cash', amount: Number(cashAmount) || 0 },
+    { method: 'card', amount: Number(cardAmount) || 0 },
+  ];
+
+  const getMixedPaymentError = (): string | null => {
+    if (selectedPayment !== 'mixed') return null;
+    const breakdown = getMixedPaymentBreakdown();
+    if (breakdown.some((item) => item.amount < 0)) {
+      return 'Los montos no pueden ser negativos';
     }
-    return base;
+    const total = breakdown.reduce((sum, item) => sum + item.amount, 0);
+    if (Number(total.toFixed(2)) !== Number(amount.toFixed(2))) {
+      return `La suma debe coincidir con ${formatCurrencyARSWithCents(amount)}`;
+    }
+    return null;
+  };
+
+  const canConfirmPayment = (): boolean => {
+    if (!selectedPayment) return false;
+    if (selectedPayment !== 'mixed') return true;
+    return getMixedPaymentError() === null;
   };
 
   const handleGoToPayment = () => {
@@ -139,14 +162,24 @@ export const VehicleExit: React.FC = () => {
     } else {
       setShowPaymentStep(true);
       setSelectedPayment(null);
+      setCashAmount('');
+      setCardAmount('');
     }
   };
 
-  const handleProcessExit = async (method: PaymentMethod) => {
+  const handleProcessExit = async (
+    method: PaymentMethod,
+    paymentBreakdown?: PaymentBreakdownItem[]
+  ) => {
     if (!selectedVehicle) return;
     setIsProcessing(true);
     try {
-      const result = await processPayment(selectedVehicle.id, method);
+      const result = await processPayment(
+        selectedVehicle.id,
+        method,
+        undefined,
+        paymentBreakdown
+      );
       setExitResult(result);
       setSelectedVehicle(result);
       setPaymentRegistered(true);
@@ -157,6 +190,13 @@ export const VehicleExit: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleConfirmPayment = () => {
+    if (!selectedPayment) return;
+    const paymentBreakdown =
+      selectedPayment === 'mixed' ? getMixedPaymentBreakdown() : undefined;
+    void handleProcessExit(selectedPayment, paymentBreakdown);
   };
 
   const handleConfirmExit = async () => {
@@ -184,12 +224,15 @@ export const VehicleExit: React.FC = () => {
     setShowPaymentStep(false);
     setSelectedPayment(null);
     setPaymentRegistered(false);
+    setCashAmount('');
+    setCardAmount('');
     void simulateDetection();
   };
 
   const duration = getCurrentDuration();
   const amount = getAmount();
   const sub = getSubscriber();
+  const subscriberValidity = sub ? getSubscriberValidity(sub) : undefined;
   const monthlyFree = isActiveMonthlySubscriber();
 
   const activeVehicles = vehicles.filter((v) => !v.exitTime);
@@ -379,18 +422,33 @@ export const VehicleExit: React.FC = () => {
 
                   {/* Subscriber info */}
                   {sub && (
-                    <div className={`p-3 rounded-lg border ${sub.status === 'active' ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className={`p-3 rounded-lg border ${subscriberValidity === 'active' ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
                       <div className="flex items-center gap-2">
-                        <Star className={`w-4 h-4 ${sub.status === 'active' ? 'text-amber-500 fill-amber-400' : 'text-gray-400'}`} />
+                        <Star className={`w-4 h-4 ${subscriberValidity === 'active' ? 'text-amber-500 fill-amber-400' : 'text-gray-400'}`} />
                         <span className="text-sm font-medium text-gray-800">{sub.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${sub.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {sub.status === 'active' ? 'Activo' : 'Inactivo'}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          subscriberValidity === 'active'
+                            ? 'bg-green-100 text-green-700'
+                            : subscriberValidity === 'expired'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {subscriberValidity === 'active'
+                            ? 'Activo'
+                            : subscriberValidity === 'expired'
+                              ? 'Vencido'
+                              : 'Inactivo'}
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1 ml-6">
                         {sub.type === 'monthly' ? 'Abono mensual' : `Descuento ${sub.discount}%`}
                         {sub.expiryDate && ` · Vence: ${new Date(sub.expiryDate).toLocaleDateString('es-CL')}`}
                       </p>
+                      {subscriberValidity !== 'active' && (
+                        <p className="text-xs text-red-700 mt-2 ml-6 font-medium">
+                          Abono {subscriberValidity === 'expired' ? 'vencido' : 'inactivo'}: corresponde cobro normal.
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -429,6 +487,14 @@ export const VehicleExit: React.FC = () => {
                     </div>
                   ) : (
                     <div className="bg-green-50 border-2 border-green-200 rounded-xl p-5">
+                      {sub?.type === 'monthly' && subscriberValidity !== 'active' && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                          <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-red-700 font-medium">
+                            Abono {subscriberValidity === 'expired' ? 'vencido' : 'inactivo'}: se aplica la tarifa normal de estadia.
+                          </p>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium text-gray-600">Monto Total</span>
                         <DollarSign className="w-5 h-5 text-green-600" />
@@ -526,9 +592,13 @@ export const VehicleExit: React.FC = () => {
                   </div>
 
                   {/* Payment options */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
-                      onClick={() => setSelectedPayment('cash')}
+                      onClick={() => {
+                        setSelectedPayment('cash');
+                        setCashAmount('');
+                        setCardAmount('');
+                      }}
                       className={`p-5 rounded-xl border-2 transition-all text-center ${
                         selectedPayment === 'cash'
                           ? 'border-green-600 bg-green-50'
@@ -540,7 +610,11 @@ export const VehicleExit: React.FC = () => {
                       <div className="text-xs text-gray-500 mt-0.5">Pago en efectivo</div>
                     </button>
                     <button
-                      onClick={() => setSelectedPayment('card')}
+                      onClick={() => {
+                        setSelectedPayment('card');
+                        setCashAmount('');
+                        setCardAmount('');
+                      }}
                       className={`p-5 rounded-xl border-2 transition-all text-center ${
                         selectedPayment === 'card'
                           ? 'border-blue-600 bg-blue-50'
@@ -551,9 +625,69 @@ export const VehicleExit: React.FC = () => {
                       <div className="font-semibold text-gray-900">Tarjeta</div>
                       <div className="text-xs text-gray-500 mt-0.5">Débito / Crédito</div>
                     </button>
+                    <button
+                      onClick={() => setSelectedPayment('mixed')}
+                      className={`p-5 rounded-xl border-2 transition-all text-center ${
+                        selectedPayment === 'mixed'
+                          ? 'border-purple-600 bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex justify-center gap-1 mb-2">
+                        <Banknote className={`w-5 h-5 ${selectedPayment === 'mixed' ? 'text-purple-600' : 'text-gray-400'}`} />
+                        <CreditCard className={`w-5 h-5 ${selectedPayment === 'mixed' ? 'text-purple-600' : 'text-gray-400'}`} />
+                      </div>
+                      <div className="font-semibold text-gray-900">Mixto</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Efectivo + tarjeta</div>
+                    </button>
                   </div>
 
-                  {selectedPayment && (
+                  {selectedPayment === 'mixed' && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-3">
+                      <p className="text-xs text-purple-700 font-medium">
+                        Distribuya el total entre efectivo y tarjeta.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Efectivo (ARS)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={cashAmount}
+                            onChange={(event) => setCashAmount(event.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Tarjeta (ARS)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={cardAmount}
+                            onChange={(event) => setCardAmount(event.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      {getMixedPaymentError() ? (
+                        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                          {getMixedPaymentError()}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
+                          Desglose correcto.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedPayment && selectedPayment !== 'mixed' && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600" />
                       <span className="text-sm text-gray-700">
@@ -570,8 +704,8 @@ export const VehicleExit: React.FC = () => {
                       Volver
                     </button>
                     <button
-                      onClick={() => selectedPayment && handleProcessExit(selectedPayment)}
-                      disabled={!selectedPayment || isProcessing}
+                      onClick={handleConfirmPayment}
+                      disabled={!canConfirmPayment() || isProcessing}
                       className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3.5 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors shadow-sm"
                     >
                       {isProcessing ? (

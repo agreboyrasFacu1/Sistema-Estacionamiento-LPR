@@ -10,6 +10,7 @@ import {
   DashboardStats,
   LPRCorrection,
   LPRDetection,
+  PaymentBreakdownItem,
   PaymentMethod,
   PricingRule,
   Subscriber,
@@ -37,10 +38,17 @@ import {
 } from '../domain/stays';
 import {
   getSubscriberByPlate as findSubscriberByPlate,
+  calculateSubscriberParkingAmount,
   getSubscriberValidity,
   isActiveMonthlySubscriber,
+  MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+  renewMonthlySubscriber,
 } from '../domain/subscribers';
-import { createTicketNumber, createTicketOperation } from '../domain/tickets';
+import {
+  createSubscriptionRenewalTicket,
+  createTicketNumber,
+  createTicketOperation,
+} from '../domain/tickets';
 import {
   calculateLprAccuracy,
   simulatedLprProvider,
@@ -71,12 +79,14 @@ interface ParkingContextType {
   processPayment: (
     vehicleId: string,
     paymentMethod: PaymentMethod,
-    manualAmount?: number
+    manualAmount?: number,
+    paymentBreakdown?: PaymentBreakdownItem[]
   ) => Promise<VehicleEntry>;
   confirmVehicleExit: (vehicleId: string) => Promise<VehicleEntry>;
   processExit: (
     vehicleId: string,
-    paymentMethod: PaymentMethod
+    paymentMethod: PaymentMethod,
+    paymentBreakdown?: PaymentBreakdownItem[]
   ) => Promise<VehicleEntry>;
   searchVehicle: (plate: string) => VehicleEntry | undefined;
   searchVehicleByQuery: (query: string) => VehicleEntry | undefined;
@@ -94,6 +104,11 @@ interface ParkingContextType {
   updateSubscriber: (subscriber: Subscriber) => void;
   deleteSubscriber: (id: string) => void;
   getSubscriberByPlate: (plate: string) => Subscriber | undefined;
+  renewSubscriberSubscription: (
+    subscriberId: string,
+    paymentMethod: PaymentMethod,
+    paymentBreakdown?: PaymentBreakdownItem[]
+  ) => Promise<{ subscriber: Subscriber; ticket: TicketOperation }>;
   recordLprCorrection: (detectedPlate: string, correctedPlate: string, confidence: number) => void;
   addWhiteRunIncident: (payload: Omit<WhiteRunIncident, 'id' | 'createdAt' | 'userId' | 'status'>) => void;
   resolveWhiteRunIncident: (id: string) => void;
@@ -225,13 +240,11 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
       duration,
       pricingRules
     );
-    const amount =
-      subscriber &&
-      subscriber.type === 'discounted' &&
-      subscriberValidity === 'active' &&
-      subscriber.discount
-        ? Number((baseAmount * (1 - subscriber.discount / 100)).toFixed(2))
-        : baseAmount;
+    const amount = calculateSubscriberParkingAmount(
+      baseAmount,
+      subscriber,
+      paidAt
+    );
 
     return {
       amount,
@@ -296,7 +309,8 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
   const processPayment = async (
     vehicleId: string,
     paymentMethod: PaymentMethod,
-    manualAmount?: number
+    manualAmount?: number,
+    paymentBreakdown?: PaymentBreakdownItem[]
   ): Promise<VehicleEntry> => {
     const vehicle = vehicles.find((item) => item.id === vehicleId);
     if (!vehicle) throw new Error('Vehiculo no encontrado');
@@ -324,6 +338,8 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
       amount: charge.amount,
       isPaid: true,
       paymentMethod: effectivePaymentMethod,
+      paymentBreakdown:
+        effectivePaymentMethod === 'mixed' ? paymentBreakdown : undefined,
       ticketNumber,
       subscriberValidity: charge.subscriberValidity,
       status: 'paid',
@@ -339,7 +355,8 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
       updatedVehicle,
       effectivePaymentMethod,
       user?.id || 'system',
-      paidAtDate
+      paidAtDate,
+      paymentBreakdown
     );
     setTickets((prev) => {
       const withoutDuplicate = prev.filter(
@@ -367,6 +384,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
         amount: charge.amount,
         paymentMethod: effectivePaymentMethod,
         ticketNumber,
+        isMixedPayment: effectivePaymentMethod === 'mixed',
       }
     );
 
@@ -440,12 +458,13 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
 
   const processExit = async (
     vehicleId: string,
-    paymentMethod: PaymentMethod
+    paymentMethod: PaymentMethod,
+    paymentBreakdown?: PaymentBreakdownItem[]
   ): Promise<VehicleEntry> => {
     const vehicle = vehicles.find((item) => item.id === vehicleId);
     if (!vehicle) throw new Error('Vehiculo no encontrado');
     if (!vehicle.isPaid) {
-      await processPayment(vehicleId, paymentMethod);
+      await processPayment(vehicleId, paymentMethod, undefined, paymentBreakdown);
     }
     return confirmVehicleExit(vehicleId);
   };
@@ -493,6 +512,55 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
 
   const deleteSubscriber = (id: string) => {
     setSubscribers((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const renewSubscriberSubscription = async (
+    subscriberId: string,
+    paymentMethod: PaymentMethod,
+    paymentBreakdown?: PaymentBreakdownItem[]
+  ): Promise<{ subscriber: Subscriber; ticket: TicketOperation }> => {
+    const subscriber = subscribers.find((item) => item.id === subscriberId);
+    if (!subscriber) throw new Error('Abonado no encontrado');
+    if (subscriber.type !== 'monthly') {
+      throw new Error('Solo se pueden renovar abonados mensuales');
+    }
+    if (paymentMethod === 'subscriber' || paymentMethod === 'no_charge') {
+      throw new Error('La renovacion de abono requiere un medio de pago');
+    }
+
+    const now = new Date();
+    const renewal = renewMonthlySubscriber(subscriber, now);
+    const ticket = createSubscriptionRenewalTicket({
+      subscriber: renewal.subscriber,
+      amount: MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+      paymentMethod,
+      paymentBreakdown,
+      cashierId: user?.id || 'system',
+      validFrom: renewal.validFrom,
+      validUntil: renewal.validUntil,
+      createdAt: now,
+    });
+
+    setSubscribers((prev) =>
+      prev.map((item) =>
+        item.id === subscriberId ? renewal.subscriber : item
+      )
+    );
+    setTickets((prev) => [ticket, ...prev]);
+    addLog(
+      'payment',
+      `Abono mensual renovado para ${renewal.subscriber.licensePlate} por ${formatCurrencyARSWithCents(renewal.amount)}`,
+      undefined,
+      {
+        amount: renewal.amount,
+        paymentMethod,
+        ticketNumber: ticket.ticketNumber,
+        subscriberId,
+        isFiscal: false,
+      }
+    );
+
+    return { subscriber: renewal.subscriber, ticket };
   };
 
   const recordLprCorrection = (
@@ -578,6 +646,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
         updateSubscriber,
         deleteSubscriber,
         getSubscriberByPlate,
+        renewSubscriberSubscription,
         recordLprCorrection,
         addWhiteRunIncident,
         resolveWhiteRunIncident,

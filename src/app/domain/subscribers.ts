@@ -1,6 +1,9 @@
 import { Subscriber, SubscriberValidity } from '../types';
 import { normalizePlate } from './plates';
 
+export const MONTHLY_SUBSCRIPTION_AMOUNT_ARS = 150000;
+export const MONTHLY_RENEWAL_DAYS = 30;
+
 export interface SubscriberPlateConflict {
   plate: string;
   subscriber: Subscriber;
@@ -36,12 +39,80 @@ export const getSubscriberValidity = (
   return 'active';
 };
 
+export const getEffectiveSubscriberStatus = getSubscriberValidity;
+
 export const isActiveMonthlySubscriber = (
   subscriber: Subscriber | undefined,
   now: Date = new Date()
 ): boolean =>
   subscriber?.type === 'monthly' &&
   getSubscriberValidity(subscriber, now) === 'active';
+
+export const isSubscriberChargeExempt = (
+  subscriber: Subscriber | undefined,
+  now: Date = new Date()
+): boolean => isActiveMonthlySubscriber(subscriber, now);
+
+export const shouldChargeAsRegularVehicle = (
+  subscriber: Subscriber | undefined,
+  now: Date = new Date()
+): boolean => !isSubscriberChargeExempt(subscriber, now);
+
+export const calculateSubscriberParkingAmount = (
+  baseAmount: number,
+  subscriber: Subscriber | undefined,
+  now: Date = new Date()
+): number => {
+  const validity = getSubscriberValidity(subscriber, now);
+  if (subscriber?.type === 'monthly' && validity === 'active') return 0;
+  if (
+    subscriber?.type === 'discounted' &&
+    validity === 'active' &&
+    typeof subscriber.discount === 'number'
+  ) {
+    return Number((baseAmount * (1 - subscriber.discount / 100)).toFixed(2));
+  }
+  return baseAmount;
+};
+
+export interface MonthlySubscriptionRenewal {
+  subscriber: Subscriber;
+  validFrom: string;
+  validUntil: string;
+  amount: number;
+}
+
+export const renewMonthlySubscriber = (
+  subscriber: Subscriber,
+  now: Date = new Date()
+): MonthlySubscriptionRenewal => {
+  if (subscriber.type !== 'monthly') {
+    throw new Error('Solo se pueden renovar abonados mensuales');
+  }
+
+  const currentExpiry =
+    subscriber.expiryDate && !Number.isNaN(new Date(subscriber.expiryDate).getTime())
+      ? new Date(subscriber.expiryDate)
+      : undefined;
+  const validity = getSubscriberValidity(subscriber, now);
+  const startsAt =
+    validity === 'active' && currentExpiry && currentExpiry.getTime() > now.getTime()
+      ? currentExpiry
+      : now;
+  const validUntil = new Date(startsAt);
+  validUntil.setDate(validUntil.getDate() + MONTHLY_RENEWAL_DAYS);
+
+  return {
+    subscriber: {
+      ...subscriber,
+      status: 'active',
+      expiryDate: validUntil.toISOString(),
+    },
+    validFrom: startsAt.toISOString(),
+    validUntil: validUntil.toISOString(),
+    amount: MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+  };
+};
 
 const getSubscriberPlates = (subscriber: Subscriber): string[] => [
   subscriber.licensePlate,

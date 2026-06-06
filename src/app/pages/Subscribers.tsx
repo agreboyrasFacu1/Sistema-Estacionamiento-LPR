@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { useParking } from '../contexts/ParkingContext';
-import { Subscriber, SubscriberType, SubscriberStatus } from '../types';
-import { findActiveSubscriberPlateConflict } from '../domain/subscribers';
+import { PaymentBreakdownItem, PaymentMethod, Subscriber, SubscriberType, SubscriberValidity } from '../types';
+import {
+  findActiveSubscriberPlateConflict,
+  getEffectiveSubscriberStatus,
+  MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+} from '../domain/subscribers';
+import { formatCurrencyARSWithCents } from '../utils/currency';
 import {
   Star,
   Plus,
@@ -18,6 +23,10 @@ import {
   Mail,
   Car,
   AlertCircle,
+  AlertTriangle,
+  Banknote,
+  CreditCard,
+  Receipt,
 } from 'lucide-react';
 
 const emptyForm: Omit<Subscriber, 'id' | 'createdAt'> = {
@@ -34,17 +43,35 @@ const emptyForm: Omit<Subscriber, 'id' | 'createdAt'> = {
 };
 
 export const Subscribers: React.FC = () => {
-  const { subscribers, addSubscriber, updateSubscriber, deleteSubscriber } = useParking();
+  const {
+    subscribers,
+    addSubscriber,
+    updateSubscriber,
+    deleteSubscriber,
+    renewSubscriberSubscription,
+  } = useParking();
   const [showModal, setShowModal] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscriber | null>(null);
   const [formData, setFormData] = useState<typeof emptyForm>(emptyForm);
   const [additionalPlateInput, setAdditionalPlateInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | SubscriberType>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | SubscriberStatus>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | SubscriberValidity>('all');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [payingSubscriber, setPayingSubscriber] = useState<Subscriber | null>(null);
+  const [renewalMethod, setRenewalMethod] = useState<PaymentMethod | null>(null);
+  const [renewalCashAmount, setRenewalCashAmount] = useState('');
+  const [renewalCardAmount, setRenewalCardAmount] = useState('');
+  const [renewalReceipt, setRenewalReceipt] = useState<{
+    subscriber: Subscriber;
+    ticketNumber: string;
+    validUntil: string;
+    amount: number;
+    paymentMethod: PaymentMethod;
+    paymentBreakdown?: PaymentBreakdownItem[];
+  } | null>(null);
 
   const buildSubscriberCandidate = (): Subscriber => ({
     ...formData,
@@ -154,8 +181,60 @@ export const Subscribers: React.FC = () => {
   };
 
   const isExpired = (sub: Subscriber) => {
-    if (sub.type !== 'monthly' || !sub.expiryDate) return false;
-    return new Date(sub.expiryDate) < new Date();
+    return getEffectiveSubscriberStatus(sub) === 'expired';
+  };
+
+  const getRenewalBreakdown = (): PaymentBreakdownItem[] => [
+    { method: 'cash', amount: Number(renewalCashAmount) || 0 },
+    { method: 'card', amount: Number(renewalCardAmount) || 0 },
+  ];
+
+  const getRenewalMixedError = (): string | null => {
+    if (renewalMethod !== 'mixed') return null;
+    const breakdown = getRenewalBreakdown();
+    if (breakdown.some((item) => item.amount < 0)) {
+      return 'Los montos no pueden ser negativos';
+    }
+    const total = breakdown.reduce((sum, item) => sum + item.amount, 0);
+    if (total !== MONTHLY_SUBSCRIPTION_AMOUNT_ARS) {
+      return `La suma debe coincidir con ${formatCurrencyARSWithCents(MONTHLY_SUBSCRIPTION_AMOUNT_ARS)}`;
+    }
+    return null;
+  };
+
+  const canConfirmRenewal = (): boolean => {
+    if (!renewalMethod) return false;
+    if (renewalMethod !== 'mixed') return true;
+    return getRenewalMixedError() === null;
+  };
+
+  const openRenewalModal = (subscriber: Subscriber) => {
+    setPayingSubscriber(subscriber);
+    setRenewalMethod(null);
+    setRenewalCashAmount('');
+    setRenewalCardAmount('');
+  };
+
+  const handleConfirmRenewal = async () => {
+    if (!payingSubscriber || !renewalMethod) return;
+    const paymentBreakdown =
+      renewalMethod === 'mixed' ? getRenewalBreakdown() : undefined;
+    const result = await renewSubscriberSubscription(
+      payingSubscriber.id,
+      renewalMethod,
+      paymentBreakdown
+    );
+    setRenewalReceipt({
+      subscriber: result.subscriber,
+      ticketNumber: result.ticket.ticketNumber,
+      validUntil: result.subscriber.expiryDate || result.ticket.validUntil || '',
+      amount: result.ticket.amount,
+      paymentMethod: result.ticket.paymentMethod,
+      paymentBreakdown: result.ticket.paymentBreakdown,
+    });
+    setPayingSubscriber(null);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   const daysUntilExpiry = (sub: Subscriber) => {
@@ -170,15 +249,16 @@ export const Subscribers: React.FC = () => {
       s.licensePlate.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchType = filterType === 'all' || s.type === filterType;
-    const matchStatus = filterStatus === 'all' || s.status === filterStatus;
+    const matchStatus =
+      filterStatus === 'all' || getEffectiveSubscriberStatus(s) === filterStatus;
     return matchSearch && matchType && matchStatus;
   });
 
-  const activeCount = subscribers.filter((s) => s.status === 'active').length;
+  const activeCount = subscribers.filter((s) => getEffectiveSubscriberStatus(s) === 'active').length;
   const monthlyCount = subscribers.filter((s) => s.type === 'monthly').length;
   const expiringCount = subscribers.filter((s) => {
     const days = daysUntilExpiry(s);
-    return days !== null && days <= 7 && days > 0 && s.status === 'active';
+    return days !== null && days <= 7 && days > 0 && getEffectiveSubscriberStatus(s) === 'active';
   }).length;
 
   return (
@@ -203,6 +283,177 @@ export const Subscribers: React.FC = () => {
             <div className="flex gap-3">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium transition-colors">Cancelar</button>
               <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-medium transition-colors">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {payingSubscriber && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Receipt className="w-5 h-5 text-blue-600" />
+                </div>
+                <h2 className="font-bold text-gray-900">Renovar Abono Mensual</h2>
+              </div>
+              <button onClick={() => setPayingSubscriber(null)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="font-semibold text-gray-900">{payingSubscriber.name}</p>
+                <p className="text-xs text-gray-500 font-mono">{payingSubscriber.licensePlate}</p>
+                <div className="flex items-center justify-between pt-3 mt-3 border-t border-blue-200">
+                  <span className="text-sm text-gray-600">Abono mensual interno</span>
+                  <span className="text-xl font-bold text-blue-700">
+                    {formatCurrencyARSWithCents(MONTHLY_SUBSCRIPTION_AMOUNT_ARS)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Ticket interno no fiscal. La vigencia se extiende 30 dias.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Medio de pago</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => {
+                      setRenewalMethod('cash');
+                      setRenewalCashAmount('');
+                      setRenewalCardAmount('');
+                    }}
+                    className={`p-3 rounded-xl border-2 transition-all text-center ${renewalMethod === 'cash' ? 'border-green-600 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <Banknote className={`w-7 h-7 mx-auto mb-1 ${renewalMethod === 'cash' ? 'text-green-600' : 'text-gray-400'}`} />
+                    <div className="text-xs font-semibold text-gray-900">Efectivo</div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRenewalMethod('card');
+                      setRenewalCashAmount('');
+                      setRenewalCardAmount('');
+                    }}
+                    className={`p-3 rounded-xl border-2 transition-all text-center ${renewalMethod === 'card' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <CreditCard className={`w-7 h-7 mx-auto mb-1 ${renewalMethod === 'card' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <div className="text-xs font-semibold text-gray-900">Tarjeta</div>
+                  </button>
+                  <button
+                    onClick={() => setRenewalMethod('mixed')}
+                    className={`p-3 rounded-xl border-2 transition-all text-center ${renewalMethod === 'mixed' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <div className="flex justify-center gap-0.5 mb-1">
+                      <Banknote className={`w-4 h-4 ${renewalMethod === 'mixed' ? 'text-purple-600' : 'text-gray-400'}`} />
+                      <CreditCard className={`w-4 h-4 ${renewalMethod === 'mixed' ? 'text-purple-600' : 'text-gray-400'}`} />
+                    </div>
+                    <div className="text-xs font-semibold text-gray-900">Mixto</div>
+                  </button>
+                </div>
+              </div>
+
+              {renewalMethod === 'mixed' && (
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Efectivo (ARS)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={renewalCashAmount}
+                        onChange={(event) => setRenewalCashAmount(event.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Tarjeta (ARS)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={renewalCardAmount}
+                        onChange={(event) => setRenewalCardAmount(event.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  {getRenewalMixedError() ? (
+                    <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                      {getRenewalMixedError()}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
+                      Desglose correcto.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button onClick={() => setPayingSubscriber(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium">Cancelar</button>
+                <button
+                  onClick={handleConfirmRenewal}
+                  disabled={!canConfirmRenewal()}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2"
+                >
+                  <Receipt className="w-4 h-4" />
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {renewalReceipt && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-blue-600 px-6 py-5 text-white text-center">
+              <CheckCircle className="w-8 h-8 mx-auto mb-2" />
+              <h2 className="font-bold text-lg">Abono Renovado</h2>
+              <p className="text-blue-100 text-sm">Ticket interno {renewalReceipt.ticketNumber}</p>
+            </div>
+            <div className="p-6 space-y-3 text-sm">
+              <div className="text-center bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <div className="text-2xl font-bold font-mono text-gray-900">{renewalReceipt.subscriber.licensePlate}</div>
+                <p className="text-gray-600 mt-1">{renewalReceipt.subscriber.name}</p>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 py-2">
+                <span className="text-gray-500">Monto</span>
+                <span className="font-bold text-blue-700">{formatCurrencyARSWithCents(renewalReceipt.amount)}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 py-2">
+                <span className="text-gray-500">Medio</span>
+                <span className="font-medium">
+                  {renewalReceipt.paymentMethod === 'cash'
+                    ? 'Efectivo'
+                    : renewalReceipt.paymentMethod === 'mixed'
+                    ? 'Mixto'
+                    : 'Tarjeta'}
+                </span>
+              </div>
+              {renewalReceipt.paymentBreakdown?.map((item) => (
+                <div key={item.method} className="flex justify-between text-xs text-gray-500">
+                  <span>{item.method === 'cash' ? 'Efectivo' : 'Tarjeta'}</span>
+                  <span>{formatCurrencyARSWithCents(item.amount)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between border-b border-gray-100 py-2">
+                <span className="text-gray-500">Vigente hasta</span>
+                <span className="font-medium text-green-700">{new Date(renewalReceipt.validUntil).toLocaleDateString('es-CL')}</span>
+              </div>
+              <p className="text-xs text-gray-400 text-center">Comprobante interno no fiscal</p>
+              <button
+                onClick={() => setRenewalReceipt(null)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
@@ -429,10 +680,11 @@ export const Subscribers: React.FC = () => {
             <option value="monthly">Mensual</option>
             <option value="discounted">Bonificado</option>
           </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as 'all' | SubscriberStatus)}
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as 'all' | SubscriberValidity)}
             className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="all">Todos los estados</option>
             <option value="active">Activos</option>
+            <option value="expired">Vencidos</option>
             <option value="inactive">Inactivos</option>
           </select>
           <button onClick={openAddModal}
@@ -453,6 +705,7 @@ export const Subscribers: React.FC = () => {
               const days = daysUntilExpiry(sub);
               const expired = isExpired(sub);
               const expiringSoon = days !== null && days <= 7 && days > 0;
+              const effectiveStatus = getEffectiveSubscriberStatus(sub);
 
               return (
                 <div key={sub.id} className="p-5 hover:bg-gray-50 transition-colors">
@@ -467,18 +720,23 @@ export const Subscribers: React.FC = () => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-gray-900">{sub.name}</span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            sub.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                            effectiveStatus === 'active'
+                              ? 'bg-green-100 text-green-700'
+                              : effectiveStatus === 'expired'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-gray-100 text-gray-600'
                           }`}>
-                            {sub.status === 'active' ? '● Activo' : '● Inactivo'}
+                            {effectiveStatus === 'active'
+                              ? '● Activo'
+                              : effectiveStatus === 'expired'
+                                ? '● Vencido'
+                                : '● Inactivo'}
                           </span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                             sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
                           }`}>
                             {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
                           </span>
-                          {expired && (
-                            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-medium">⚠️ Vencido</span>
-                          )}
                           {expiringSoon && !expired && (
                             <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">⏰ Vence en {days}d</span>
                           )}
@@ -523,6 +781,20 @@ export const Subscribers: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1 ml-4">
+                      {sub.type === 'monthly' && (
+                        <button
+                          onClick={() => openRenewalModal(sub)}
+                          className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors ${
+                            effectiveStatus === 'active'
+                              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                              : 'bg-green-50 text-green-700 hover:bg-green-100'
+                          }`}
+                          title="Renovar abono mensual"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          {effectiveStatus === 'active' ? 'Renovar' : 'Cobrar'}
+                        </button>
+                      )}
                       <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                         <Edit className="w-4 h-4" />
                       </button>
