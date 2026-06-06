@@ -720,18 +720,23 @@ export const Subscribers: React.FC = () => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-gray-900">{sub.name}</span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            sub.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                            effectiveStatus === 'active'
+                              ? 'bg-green-100 text-green-700'
+                              : effectiveStatus === 'expired'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-gray-100 text-gray-600'
                           }`}>
-                            {sub.status === 'active' ? '● Activo' : '● Inactivo'}
+                            {effectiveStatus === 'active'
+                              ? '● Activo'
+                              : effectiveStatus === 'expired'
+                                ? '● Vencido'
+                                : '● Inactivo'}
                           </span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                             sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
                           }`}>
                             {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
                           </span>
-                          {expired && (
-                            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-medium">⚠️ Vencido</span>
-                          )}
                           {expiringSoon && !expired && (
                             <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">⏰ Vence en {days}d</span>
                           )}

@@ -422,12 +422,22 @@ export const VehicleExit: React.FC = () => {
 
                   {/* Subscriber info */}
                   {sub && (
-                    <div className={`p-3 rounded-lg border ${sub.status === 'active' ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className={`p-3 rounded-lg border ${subscriberValidity === 'active' ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
                       <div className="flex items-center gap-2">
-                        <Star className={`w-4 h-4 ${sub.status === 'active' ? 'text-amber-500 fill-amber-400' : 'text-gray-400'}`} />
+                        <Star className={`w-4 h-4 ${subscriberValidity === 'active' ? 'text-amber-500 fill-amber-400' : 'text-gray-400'}`} />
                         <span className="text-sm font-medium text-gray-800">{sub.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${sub.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {sub.status === 'active' ? 'Activo' : 'Inactivo'}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          subscriberValidity === 'active'
+                            ? 'bg-green-100 text-green-700'
+                            : subscriberValidity === 'expired'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {subscriberValidity === 'active'
+                            ? 'Activo'
+                            : subscriberValidity === 'expired'
+                              ? 'Vencido'
+                              : 'Inactivo'}
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1 ml-6">
