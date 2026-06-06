@@ -10,11 +10,7 @@ import {
   Edit3,
 } from 'lucide-react';
 import { useParking } from '../contexts/ParkingContext';
-import {
-  forceSimulatedDetection,
-  simulatedLprProvider,
-  webcamDemoLprProvider,
-} from '../domain/lpr';
+import { webcamDemoLprProvider } from '../domain/lpr';
 import type { LprFrame } from '../domain/lpr';
 import { normalizePlate, validatePlate } from '../domain/plates';
 import { LPRDetection } from '../types';
@@ -27,7 +23,7 @@ interface CameraModalProps {
 }
 
 type CameraState = 'initializing' | 'scanning' | 'detected' | 'error' | 'unavailable';
-type CameraMode = 'webcam-demo' | 'simulated' | 'manual-fallback';
+type CameraMode = 'webcam-demo' | 'manual-fallback';
 
 const canvasToBlob = (canvas: HTMLCanvasElement, quality = 0.95): Promise<Blob | null> =>
   new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
@@ -179,21 +175,6 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     }, delay);
   };
 
-  const startSimulated = async () => {
-    cleanup();
-    setMode('simulated');
-    setCameraState('scanning');
-    setDetection(null);
-    setCorrectedPlate('');
-    setErrorMessage('');
-    setIsReadingFrame(false);
-    resetStableDetection();
-
-    timeoutRef.current = setTimeout(async () => {
-      applyDetection(await simulatedLprProvider.detect());
-    }, 900);
-  };
-
   const startWebcam = async (deviceId = selectedDeviceId) => {
     cleanup();
     setMode('webcam-demo');
@@ -232,11 +213,6 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   };
 
   const captureFrame = async (captureMode: CameraMode = mode) => {
-    if (captureMode === 'simulated') {
-      applyDetection(forceSimulatedDetection());
-      return;
-    }
-
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) {
@@ -318,7 +294,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   if (!isOpen) return null;
 
   const confidence = detection ? Math.round(detection.confidence * 100) : 0;
-  const sourceLabel = mode === 'webcam-demo' ? 'Camara LPR' : mode === 'simulated' ? 'Lectura asistida' : 'Manual';
+  const sourceLabel = mode === 'webcam-demo' ? 'Camara LPR' : 'Manual';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -338,20 +314,13 @@ export const CameraModal: React.FC<CameraModalProps> = ({
           </button>
         </div>
 
-        <div className="px-6 pt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="px-6 pt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
           <button
             onClick={() => void startWebcam()}
             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${mode === 'webcam-demo' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
             <Video className="w-4 h-4" />
             Camara LPR
-          </button>
-          <button
-            onClick={() => void startSimulated()}
-            className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${mode === 'simulated' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-          >
-            <Camera className="w-4 h-4" />
-            Lectura asistida
           </button>
           <button
             onClick={() => {
@@ -472,12 +441,6 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             <button disabled className="flex-1 min-w-40 bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               Lectura automatica
-            </button>
-          )}
-          {cameraState === 'unavailable' && (
-            <button onClick={() => void startSimulated()} className="flex-1 min-w-40 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors">
-              <RefreshCw className="w-4 h-4" />
-              Lectura asistida
             </button>
           )}
           {cameraState === 'detected' && !detection && mode === 'webcam-demo' && (

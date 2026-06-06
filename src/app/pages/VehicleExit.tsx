@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useParking } from '../contexts/ParkingContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,7 +9,6 @@ import {
   CheckCircle,
   AlertTriangle,
   Loader2,
-  RefreshCw,
   DollarSign,
   Clock,
   Calendar,
@@ -35,7 +34,6 @@ export const VehicleExit: React.FC = () => {
     vehicles,
     pricingRules,
     currentDetection,
-    simulateDetection,
     processPayment,
     confirmVehicleExit,
     searchVehicle,
@@ -43,6 +41,11 @@ export const VehicleExit: React.FC = () => {
   } = useParking();
   const { isTrainingMode } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeDetectedPlate =
+    typeof (location.state as { detectedPlate?: unknown } | null)?.detectedPlate === 'string'
+      ? (location.state as { detectedPlate: string }).detectedPlate
+      : '';
 
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleEntry | null>(null);
   const [manualPlate, setManualPlate] = useState('');
@@ -59,8 +62,16 @@ export const VehicleExit: React.FC = () => {
   const [cardAmount, setCardAmount] = useState('');
 
   useEffect(() => {
-    void simulateDetection();
-  }, []);
+    if (!routeDetectedPlate) return;
+    const vehicle = searchVehicle(routeDetectedPlate);
+    if (vehicle) {
+      setSelectedVehicle(vehicle);
+      setSearchError('');
+    } else {
+      setSelectedVehicle(null);
+      setSearchError(`Patente ${routeDetectedPlate} no encontrada en el estacionamiento`);
+    }
+  }, [routeDetectedPlate]);
 
   useEffect(() => {
     if (currentDetection && !isManualSearch) {
@@ -226,7 +237,6 @@ export const VehicleExit: React.FC = () => {
     setPaymentRegistered(false);
     setCashAmount('');
     setCardAmount('');
-    void simulateDetection();
   };
 
   const duration = getCurrentDuration();
@@ -283,13 +293,6 @@ export const VehicleExit: React.FC = () => {
                   title="Usar cámara"
                 >
                   <Camera className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => { void simulateDetection(); setIsManualSearch(false); }}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Nueva detección"
-                >
-                  <RefreshCw className="w-5 h-5" />
                 </button>
               </div>
             </div>
