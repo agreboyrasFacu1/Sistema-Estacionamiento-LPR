@@ -21,11 +21,11 @@ El sistema fue refactorizado desde prototipo visual hacia un MVP frontend persis
 - Categorias estrictas: Auto, Camioneta y Moto.
 - Moneda operativa: pesos argentinos (ARS).
 - El cobro base cubre la primera hora completa.
-- Auto y Camioneta: primera hora $5.000, fraccion posterior de 10 minutos $500, equivalente posterior $3.000/h.
-- Moto: primera hora $3.000, fraccion posterior de 10 minutos $300, equivalente posterior $1.800/h.
+- Auto y Camioneta: primera hora $5.000, fraccion posterior default de 10 minutos $750 (15% de la hora inicial, modificable).
+- Moto: primera hora $3.000, fraccion posterior default de 10 minutos $450 (15% de la hora inicial, modificable).
 - Luego de la primera hora, el cobro fracciona automaticamente cada 10 minutos.
 - La tolerancia es de 3 minutos posteriores al pago para confirmar el egreso.
-- La tolerancia no es tiempo sin cargo desde el ingreso.
+- No hay regla de salida sin cargo por estadia corta: desde el primer minuto se cobra la hora inicial.
 - Los abonados mensuales activos y no vencidos tienen salida sin cobro.
 - Abono mensual operativo de referencia: $150.000.
 - Los abonados vencidos o inactivos no tienen bypass de cobro.

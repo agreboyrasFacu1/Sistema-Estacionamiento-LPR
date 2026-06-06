@@ -2,13 +2,29 @@ import { PricingRule, VehicleCategory } from '../types';
 
 export const BASE_BILLING_MINUTES = 60;
 export const BILLING_FRACTION_MINUTES = 10;
+export const DEFAULT_FRACTION_PRICE_RATE = 0.15;
 export const EXIT_GRACE_MINUTES = 3;
 
-export const normalizePricingRule = (rule: PricingRule): PricingRule => ({
-  ...rule,
-  baseMinutes: BASE_BILLING_MINUTES,
-  fraction: BILLING_FRACTION_MINUTES,
-});
+export const calculateDefaultFractionPrice = (basePrice: number): number => {
+  const safeBasePrice = Number.isFinite(basePrice) ? basePrice : 0;
+  return Number((safeBasePrice * DEFAULT_FRACTION_PRICE_RATE).toFixed(2));
+};
+
+export const normalizePricingRule = (rule: PricingRule): PricingRule => {
+  const basePrice = Number.isFinite(rule.basePrice) ? rule.basePrice : 0;
+  const rawFractionPrice = (rule as PricingRule & { fractionPrice?: number }).fractionPrice;
+  const fractionPrice = Number.isFinite(rawFractionPrice)
+    ? rawFractionPrice
+    : calculateDefaultFractionPrice(basePrice);
+
+  return {
+    ...rule,
+    basePrice,
+    fractionPrice,
+    baseMinutes: BASE_BILLING_MINUTES,
+    fraction: BILLING_FRACTION_MINUTES,
+  };
+};
 
 export const calculateParkingFee = (
   category: VehicleCategory,
@@ -20,16 +36,14 @@ export const calculateParkingFee = (
 
   const normalized = normalizePricingRule(rule);
   if (durationMinutes <= normalized.baseMinutes) {
-    return Math.min(normalized.basePrice, normalized.dailyMax);
+    return normalized.basePrice;
   }
 
   const extraMinutes = durationMinutes - normalized.baseMinutes;
   const extraFractions = Math.ceil(extraMinutes / normalized.fraction);
-  const fractionAmount =
-    normalized.hourlyRate * (normalized.fraction / BASE_BILLING_MINUTES);
-  const total = normalized.basePrice + extraFractions * fractionAmount;
+  const total = normalized.basePrice + extraFractions * normalized.fractionPrice;
 
-  return Math.min(Number(total.toFixed(2)), normalized.dailyMax);
+  return Number(total.toFixed(2));
 };
 
 export const translateCategory = (category: VehicleCategory | string): string => {

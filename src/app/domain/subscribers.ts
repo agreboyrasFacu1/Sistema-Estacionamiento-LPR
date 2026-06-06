@@ -3,6 +3,7 @@ import { normalizePlate } from './plates';
 
 export const MONTHLY_SUBSCRIPTION_AMOUNT_ARS = 150000;
 export const MONTHLY_RENEWAL_MONTHS = 1;
+export const MONTHLY_RENEWAL_WINDOW_DAYS = 5;
 
 export interface SubscriberPlateConflict {
   plate: string;
@@ -114,6 +115,26 @@ export const renewMonthlySubscriber = (
     validUntil: validUntil.toISOString(),
     amount,
   };
+};
+
+export const getDaysUntilMonthlyExpiry = (
+  subscriber: Subscriber,
+  now: Date = new Date()
+): number | null => {
+  if (subscriber.type !== 'monthly' || !subscriber.expiryDate) return null;
+  const expiryTime = new Date(subscriber.expiryDate).getTime();
+  if (Number.isNaN(expiryTime)) return null;
+  return Math.ceil((expiryTime - now.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+export const canRenewMonthlySubscriber = (
+  subscriber: Subscriber,
+  now: Date = new Date()
+): boolean => {
+  if (subscriber.type !== 'monthly') return false;
+  if (subscriber.status === 'inactive') return true;
+  const days = getDaysUntilMonthlyExpiry(subscriber, now);
+  return days === null || days <= MONTHLY_RENEWAL_WINDOW_DAYS;
 };
 
 const getSubscriberPlates = (subscriber: Subscriber): string[] => [

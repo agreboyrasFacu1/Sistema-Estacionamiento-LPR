@@ -41,6 +41,7 @@ import {
 import {
   getSubscriberByPlate as findSubscriberByPlate,
   calculateSubscriberParkingAmount,
+  canRenewMonthlySubscriber,
   getSubscriberValidity,
   isActiveMonthlySubscriber,
   MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
@@ -140,7 +141,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
   const [currentDetection, setCurrentDetection] =
     useState<LPRDetection | null>(null);
   const [pricingRules, setPricingRules] = useState<PricingRule[]>(() =>
-    loadFromStorage('pricing-rules', PRICING_RULES)
+    loadFromStorage('pricing-rules', PRICING_RULES).map(normalizePricingRule)
   );
   const [subscriberPricingRules, setSubscriberPricingRules] = useState<SubscriberPricingRule[]>(() =>
     loadFromStorage('subscriber-pricing-rules', SUBSCRIBER_PRICING_RULES)
@@ -273,8 +274,8 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const stats: DashboardStats = useMemo(
-    () => calculateDashboardStats(vehicles),
-    [vehicles]
+    () => calculateDashboardStats(vehicles, tickets),
+    [vehicles, tickets]
   );
 
   const lprAccuracy = useMemo(
@@ -629,6 +630,9 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     if (!subscriber) throw new Error('Abonado no encontrado');
     if (subscriber.type !== 'monthly') {
       throw new Error('Solo se pueden renovar abonados mensuales');
+    }
+    if (!canRenewMonthlySubscriber(subscriber)) {
+      throw new Error('Solo se puede renovar cuando falten 5 dias o menos para el vencimiento');
     }
     if (paymentMethod === 'subscriber' || paymentMethod === 'no_charge') {
       throw new Error('La renovacion de abono requiere un medio de pago');

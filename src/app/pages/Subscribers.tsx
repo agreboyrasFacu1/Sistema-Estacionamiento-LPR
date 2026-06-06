@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { useParking } from '../contexts/ParkingContext';
+import { useAuth } from '../contexts/AuthContext';
 import { PaymentBreakdownItem, PaymentMethod, Subscriber, SubscriberType, SubscriberValidity, VehicleCategory } from '../types';
 import {
+  canRenewMonthlySubscriber,
   findActiveSubscriberPlateConflict,
   getEffectiveSubscriberStatus,
+  getDaysUntilMonthlyExpiry,
   MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+  MONTHLY_RENEWAL_WINDOW_DAYS,
 } from '../domain/subscribers';
 import { formatCurrencyARSWithCents } from '../utils/currency';
 import {
@@ -58,6 +62,8 @@ export const Subscribers: React.FC = () => {
     renewSubscriberSubscription,
     subscriberPricingRules,
   } = useParking();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [showModal, setShowModal] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscriber | null>(null);
   const [formData, setFormData] = useState<typeof emptyForm>(emptyForm);
@@ -83,6 +89,7 @@ export const Subscribers: React.FC = () => {
     paymentMethod: PaymentMethod;
     paymentBreakdown?: PaymentBreakdownItem[];
   } | null>(null);
+  const canEditAdminFields = isAdmin || !editingSub;
 
   const buildSubscriberCandidate = (): Subscriber => ({
     ...formData,
@@ -191,7 +198,7 @@ export const Subscribers: React.FC = () => {
 
   const handleSave = () => {
     if (!validate()) return;
-    const payload = {
+    const basePayload = {
       ...formData,
       licensePlate: formData.licensePlate.toUpperCase(),
       additionalPlates: (formData.additionalPlates || []).map((p) => p.toUpperCase()),
@@ -200,6 +207,18 @@ export const Subscribers: React.FC = () => {
         ? editingSub.expiryDate
         : undefined,
     };
+    const payload =
+      editingSub && !isAdmin
+        ? {
+            ...basePayload,
+            type: editingSub.type,
+            status: editingSub.status,
+            category: editingSub.category,
+            discount: editingSub.discount,
+            amount: editingSub.amount,
+            expiryDate: editingSub.expiryDate,
+          }
+        : basePayload;
     if (editingSub) {
       updateSubscriber({ ...payload, id: editingSub.id, createdAt: editingSub.createdAt });
     } else {
@@ -283,6 +302,7 @@ export const Subscribers: React.FC = () => {
   };
 
   const openRenewalModal = (subscriber: Subscriber) => {
+    if (!canRenewMonthlySubscriber(subscriber)) return;
     setPayingSubscriber(subscriber);
     setRenewalMethod(null);
     setRenewalCashAmount('');
@@ -293,28 +313,33 @@ export const Subscribers: React.FC = () => {
     if (!payingSubscriber || !renewalMethod) return;
     const paymentBreakdown =
       renewalMethod === 'mixed' ? getRenewalBreakdown() : undefined;
-    const result = await renewSubscriberSubscription(
-      payingSubscriber.id,
-      renewalMethod,
-      paymentBreakdown
-    );
-    setRenewalReceipt({
-      subscriber: result.subscriber,
-      ticketNumber: result.ticket.ticketNumber,
-      validUntil: result.subscriber.expiryDate || result.ticket.validUntil || '',
-      amount: result.ticket.amount,
-      paymentMethod: result.ticket.paymentMethod,
-      paymentBreakdown: result.ticket.paymentBreakdown,
-    });
-    setPayingSubscriber(null);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    try {
+      const result = await renewSubscriberSubscription(
+        payingSubscriber.id,
+        renewalMethod,
+        paymentBreakdown
+      );
+      setRenewalReceipt({
+        subscriber: result.subscriber,
+        ticketNumber: result.ticket.ticketNumber,
+        validUntil: result.subscriber.expiryDate || result.ticket.validUntil || '',
+        amount: result.ticket.amount,
+        paymentMethod: result.ticket.paymentMethod,
+        paymentBreakdown: result.ticket.paymentBreakdown,
+      });
+      setPayingSubscriber(null);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (error) {
+      setErrors({
+        ...errors,
+        renewal: error instanceof Error ? error.message : 'No se pudo renovar el abono',
+      });
+    }
   };
 
   const daysUntilExpiry = (sub: Subscriber) => {
-    if (!sub.expiryDate) return null;
-    const diff = new Date(sub.expiryDate).getTime() - Date.now();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return getDaysUntilMonthlyExpiry(sub);
   };
 
   const filteredSubs = subscribers.filter((s) => {
@@ -479,6 +504,11 @@ export const Subscribers: React.FC = () => {
                   Confirmar
                 </button>
               </div>
+              {errors.renewal && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                  {errors.renewal}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -546,29 +576,38 @@ export const Subscribers: React.FC = () => {
 
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               {/* Type selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Abono</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                  onClick={() => setFormData({ ...formData, type: 'monthly' })}
-                    className={`p-3 rounded-xl border-2 text-center transition-all ${formData.type === 'monthly' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                  >
-                    <Calendar className={`w-6 h-6 mx-auto mb-1 ${formData.type === 'monthly' ? 'text-blue-600' : 'text-gray-400'}`} />
-                    <div className="text-sm font-medium text-gray-900">Mensual</div>
-                    <div className="text-xs text-gray-500">Cobro mensual fijo</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: 'discounted' })}
-                    className={`p-3 rounded-xl border-2 text-center transition-all ${formData.type === 'discounted' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}
-                  >
-                    <Star className={`w-6 h-6 mx-auto mb-1 ${formData.type === 'discounted' ? 'text-amber-500 fill-amber-400' : 'text-gray-400'}`} />
-                    <div className="text-sm font-medium text-gray-900">Bonificado</div>
-                    <div className="text-xs text-gray-500">Descuento especial</div>
-                  </button>
+              {canEditAdminFields ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Abono</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, type: 'monthly' })}
+                      className={`p-3 rounded-xl border-2 text-center transition-all ${formData.type === 'monthly' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    >
+                      <Calendar className={`w-6 h-6 mx-auto mb-1 ${formData.type === 'monthly' ? 'text-blue-600' : 'text-gray-400'}`} />
+                      <div className="text-sm font-medium text-gray-900">Mensual</div>
+                      <div className="text-xs text-gray-500">Cobro mensual fijo</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, type: 'discounted' })}
+                      className={`p-3 rounded-xl border-2 text-center transition-all ${formData.type === 'discounted' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    >
+                      <Star className={`w-6 h-6 mx-auto mb-1 ${formData.type === 'discounted' ? 'text-amber-500 fill-amber-400' : 'text-gray-400'}`} />
+                      <div className="text-sm font-medium text-gray-900">Bonificado</div>
+                      <div className="text-xs text-gray-500">Descuento especial</div>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <div className="text-xs text-gray-500 mb-1">Tipo de abono</div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {editingSub?.type === 'monthly' ? 'Mensual' : 'Bonificado'}
+                  </div>
+                </div>
+              )}
 
               {/* Name */}
               <div>
@@ -635,6 +674,7 @@ export const Subscribers: React.FC = () => {
               {/* Type-specific fields */}
               {formData.type === 'monthly' ? (
                 <div className="space-y-4">
+                  {canEditAdminFields && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Categoría del Abono</label>
                     <div className="grid grid-cols-3 gap-2">
@@ -654,6 +694,7 @@ export const Subscribers: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  )}
 
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                     <div className="flex items-center justify-between">
@@ -758,6 +799,7 @@ export const Subscribers: React.FC = () => {
                   )}
                 </div>
               ) : (
+                canEditAdminFields ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Porcentaje de Descuento (%)</label>
                   <input type="number" min="1" max="100" value={formData.discount || ''} onChange={(e) => setFormData({ ...formData, discount: parseInt(e.target.value) || 0 })}
@@ -765,9 +807,16 @@ export const Subscribers: React.FC = () => {
                     placeholder="50" />
                   {errors.discount && <p className="text-xs text-red-600 mt-1">{errors.discount}</p>}
                 </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                    <div className="text-xs text-gray-500 mb-1">Descuento</div>
+                    <div className="text-sm font-semibold text-gray-900">{editingSub?.discount || 0}%</div>
+                  </div>
+                )
               )}
 
               {/* Status */}
+              {isAdmin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
                 <div className="flex gap-3">
@@ -781,6 +830,7 @@ export const Subscribers: React.FC = () => {
                   </button>
                 </div>
               </div>
+              )}
 
               {/* Notes */}
               <div>
@@ -985,8 +1035,13 @@ export const Subscribers: React.FC = () => {
                         {sub.type === 'monthly' && (
                           <button
                             onClick={() => openRenewalModal(sub)}
-                            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100"
-                            title="Renovar abono mensual"
+                            disabled={!canRenewMonthlySubscriber(sub)}
+                            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            title={
+                              canRenewMonthlySubscriber(sub)
+                                ? 'Renovar abono mensual'
+                                : `Disponible cuando falten ${MONTHLY_RENEWAL_WINDOW_DAYS} dias o menos`
+                            }
                           >
                             <Receipt className="w-3.5 h-3.5" />
                             Renovar
@@ -995,9 +1050,11 @@ export const Subscribers: React.FC = () => {
                         <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAdmin && (
+                          <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1104,9 +1161,11 @@ export const Subscribers: React.FC = () => {
                         <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAdmin && (
+                          <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1195,9 +1254,11 @@ export const Subscribers: React.FC = () => {
                         <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAdmin && (
+                          <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

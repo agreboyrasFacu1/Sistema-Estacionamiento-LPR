@@ -30,7 +30,7 @@ El sistema valida formato de patente y evita duplicados activos.
 
 Si vence la tolerancia post-pago y corresponde un adicional, el sistema vuelve el estado a pago pendiente.
 
-La moneda operativa es pesos argentinos (ARS). Para Auto y Camioneta, la primera hora es $5.000 y la fraccion posterior de 10 minutos es $500. Para Moto, la primera hora es $3.000 y la fraccion posterior de 10 minutos es $300. La tolerancia no es tiempo sin cargo desde el ingreso.
+La moneda operativa es pesos argentinos (ARS). Para Auto y Camioneta, la primera hora es $5.000 y la fraccion posterior default de 10 minutos es $750. Para Moto, la primera hora es $3.000 y la fraccion posterior default de 10 minutos es $450. La fraccion equivale por defecto al 15% de la hora inicial y puede modificarse desde Administracion. No hay salida sin cargo por estadia corta: desde el primer minuto se cobra la hora inicial.
 
 ## Busqueda
 

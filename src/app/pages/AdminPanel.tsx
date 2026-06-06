@@ -4,6 +4,10 @@ import { translateCategory } from '../data/mockData';
 import { PricingRule, VehicleCategory } from '../types';
 import { formatLprAccuracy, getLprAccuracySummary } from '../domain/lpr';
 import {
+  calculateDefaultFractionPrice,
+  normalizePricingRule,
+} from '../domain/pricing';
+import {
   DollarSign,
   FileText,
   BarChart3,
@@ -30,26 +34,23 @@ const CATEGORIES: { value: VehicleCategory; label: string; icon: string }[] = [
 
 const PRICING_DEFAULTS: Record<
   VehicleCategory,
-  Pick<PricingRule, 'basePrice' | 'hourlyRate' | 'dailyMax' | 'fraction' | 'baseMinutes'>
+  Pick<PricingRule, 'basePrice' | 'fractionPrice' | 'fraction' | 'baseMinutes'>
 > = {
   auto: {
     basePrice: 5000,
-    hourlyRate: 3000,
-    dailyMax: 40000,
+    fractionPrice: 750,
     fraction: 10,
     baseMinutes: 60,
   },
   camioneta: {
     basePrice: 5000,
-    hourlyRate: 3000,
-    dailyMax: 40000,
+    fractionPrice: 750,
     fraction: 10,
     baseMinutes: 60,
   },
   moto: {
     basePrice: 3000,
-    hourlyRate: 1800,
-    dailyMax: 24000,
+    fractionPrice: 450,
     fraction: 10,
     baseMinutes: 60,
   },
@@ -60,6 +61,11 @@ const createEmptyRule = (category: VehicleCategory = 'auto'): Omit<PricingRule, 
   name: '',
   ...PRICING_DEFAULTS[category],
 });
+
+const parseMoneyInput = (value: string): number => {
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 export const AdminPanel: React.FC = () => {
   const {
@@ -95,15 +101,15 @@ export const AdminPanel: React.FC = () => {
   };
 
   const openEditModal = (rule: PricingRule) => {
+    const normalizedRule = normalizePricingRule(rule);
     setEditingRule(rule);
     setFormData({
-      category: rule.category,
-      name: rule.name,
-      basePrice: rule.basePrice,
-      hourlyRate: rule.hourlyRate,
-      dailyMax: rule.dailyMax,
-      fraction: rule.fraction,
-      baseMinutes: rule.baseMinutes,
+      category: normalizedRule.category,
+      name: normalizedRule.name,
+      basePrice: normalizedRule.basePrice,
+      fractionPrice: normalizedRule.fractionPrice,
+      fraction: normalizedRule.fraction,
+      baseMinutes: normalizedRule.baseMinutes,
     });
     setShowModal(true);
   };
@@ -292,46 +298,43 @@ export const AdminPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Precio Base (ARS)
+                    Hora inicial (ARS)
                   </label>
                   <input
                     type="number"
                     min="0"
                     step="0.5"
                     value={formData.basePrice}
-                    onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const basePrice = parseMoneyInput(e.target.value);
+                      setFormData({
+                        ...formData,
+                        basePrice,
+                        fractionPrice: calculateDefaultFractionPrice(basePrice),
+                      });
+                    }}
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Tarifa posterior por Hora (ARS)
+                    Fracción posterior (ARS)
                   </label>
                   <input
                     type="number"
                     min="0"
                     step="0.5"
-                    value={formData.hourlyRate}
-                    onChange={(e) => setFormData({ ...formData, hourlyRate: parseFloat(e.target.value) || 0 })}
+                    value={formData.fractionPrice}
+                    onChange={(e) => setFormData({ ...formData, fractionPrice: parseMoneyInput(e.target.value) })}
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Default sugerido: 15% de la hora inicial. Se puede modificar.
+                  </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Máximo Diario (ARS)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.dailyMax}
-                    onChange={(e) => setFormData({ ...formData, dailyMax: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              <div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Fracción (minutos)
@@ -370,18 +373,14 @@ export const AdminPanel: React.FC = () => {
                   <Info className="w-4 h-4" />
                   <span className="text-sm font-medium">Vista Previa</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-blue-800">
+                <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
                   <div>
                     <div className="font-semibold">{formatCurrencyARSWithCents(formData.basePrice)}</div>
-                    <div className="text-blue-600">1ª hora</div>
+                    <div className="text-blue-600">Hora inicial</div>
                   </div>
                   <div>
-                    <div className="font-semibold">{formatCurrencyARSWithCents(formData.hourlyRate)}/h</div>
-                    <div className="text-blue-600">Hora posterior</div>
-                  </div>
-                  <div>
-                    <div className="font-semibold">{formatCurrencyARSWithCents(formData.dailyMax)}</div>
-                    <div className="text-blue-600">Máx. diario</div>
+                    <div className="font-semibold">{formatCurrencyARSWithCents(formData.fractionPrice)}</div>
+                    <div className="text-blue-600">c/10 min posteriores</div>
                   </div>
                 </div>
               </div>
@@ -495,16 +494,12 @@ export const AdminPanel: React.FC = () => {
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Precio base:</span>
+                            <span className="text-gray-500">Hora inicial:</span>
                             <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(rule.basePrice)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Hora posterior:</span>
-                            <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(rule.hourlyRate)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Máx. diario:</span>
-                            <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(rule.dailyMax)}</span>
+                            <span className="text-gray-500">Valor fracción:</span>
+                            <span className="font-semibold text-gray-900">{formatCurrencyARSWithCents(rule.fractionPrice)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-500">Fracción:</span>
@@ -516,7 +511,7 @@ export const AdminPanel: React.FC = () => {
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <span>Tolerancia post-pago: 3 min</span>
                             <span className="text-blue-600 font-medium">
-                              Ej. 3h: 1h base + 12 fracciones = {formatCurrencyARSWithCents(rule.basePrice + 2 * rule.hourlyRate)}
+                              Ej. 3h: 1h inicial + 12 fracciones = {formatCurrencyARSWithCents(rule.basePrice + 12 * rule.fractionPrice)}
                             </span>
                           </div>
                         </div>
@@ -559,7 +554,7 @@ export const AdminPanel: React.FC = () => {
                           step="1"
                           value={rule.monthlyPrice}
                           onChange={(event) =>
-                            handleSubscriberPriceChange(rule.id, parseFloat(event.target.value) || 0)
+                            handleSubscriberPriceChange(rule.id, parseMoneyInput(event.target.value))
                           }
                           className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />

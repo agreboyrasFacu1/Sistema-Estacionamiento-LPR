@@ -65,8 +65,7 @@ export interface PricingRule {
   category: VehicleCategory;
   name: string;
   basePrice: number; // first hour
-  hourlyRate: number; // equivalent hourly rate used to derive post-base fractions
-  dailyMax: number; // maximum daily charge
+  fractionPrice: number; // charge for each post-base fraction
   fraction: number; // must remain 10 minutes for project scope
   baseMinutes: number; // must remain 60 minutes for project scope
 }

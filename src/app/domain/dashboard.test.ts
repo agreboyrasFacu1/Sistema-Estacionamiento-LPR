@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateDashboardStats } from './dashboard';
-import { VehicleEntry } from '../types';
+import { TicketOperation, VehicleEntry } from '../types';
 
 const now = new Date('2026-05-13T15:00:00.000Z');
 
@@ -47,13 +47,60 @@ const vehicles: VehicleEntry[] = [
   },
 ];
 
+const subscriptionTickets: TicketOperation[] = [
+  {
+    id: 'abono-hoy',
+    ticketNumber: 'ABN-20260513-000001',
+    operationType: 'subscription_renewal',
+    vehicleId: 'subscriber-1',
+    licensePlate: 'AB123CD',
+    entryTime: '2026-05-13T11:00:00.000Z',
+    paidAt: '2026-05-13T11:00:00.000Z',
+    duration: 0,
+    amount: 150000,
+    paymentMethod: 'cash',
+    subscriberId: '1',
+    subscriberName: 'Abonado',
+    validFrom: '2026-05-13T11:00:00.000Z',
+    validUntil: '2026-06-13T11:00:00.000Z',
+    isFiscal: false,
+    cashierId: '1',
+    createdAt: '2026-05-13T11:00:00.000Z',
+  },
+  {
+    id: 'abono-ayer',
+    ticketNumber: 'ABN-20260512-000001',
+    operationType: 'subscription_renewal',
+    vehicleId: 'subscriber-2',
+    licensePlate: 'CD456EF',
+    entryTime: '2026-05-12T11:00:00.000Z',
+    paidAt: '2026-05-12T11:00:00.000Z',
+    duration: 0,
+    amount: 150000,
+    paymentMethod: 'card',
+    subscriberId: '2',
+    subscriberName: 'Abonado anterior',
+    validFrom: '2026-05-12T11:00:00.000Z',
+    validUntil: '2026-06-12T11:00:00.000Z',
+    isFiscal: false,
+    cashierId: '1',
+    createdAt: '2026-05-12T11:00:00.000Z',
+  },
+];
+
 describe('calculateDashboardStats', () => {
   it('uses ARS demo amounts for same-day revenue', () => {
-    const stats = calculateDashboardStats(vehicles, now);
+    const stats = calculateDashboardStats(vehicles, [], now);
 
     expect(stats.vehiclesInside).toBe(1);
     expect(stats.todayEntries).toBe(3);
     expect(stats.todayRevenue).toBe(12800);
     expect(stats.averageDuration).toBe(120);
+  });
+
+  it('includes same-day monthly subscription payments in daily revenue', () => {
+    const stats = calculateDashboardStats(vehicles, subscriptionTickets, now);
+
+    expect(stats.todayRevenue).toBe(162800);
   });
 });

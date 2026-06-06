@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateSubscriberParkingAmount,
+  canRenewMonthlySubscriber,
   findActiveSubscriberPlateConflict,
   getEffectiveSubscriberStatus,
+  getDaysUntilMonthlyExpiry,
   getSubscriberByPlate,
   getSubscriberValidity,
   hasActiveSubscriberPlateConflict,
@@ -182,6 +184,24 @@ describe('subscriber domain', () => {
     expect(renewal.validFrom).toBe('2026-12-31T00:00:00.000Z');
     expect(renewal.validUntil).toBe('2027-01-31T00:00:00.000Z');
     expect(renewal.subscriber.expiryDate).toBe('2027-01-31T00:00:00.000Z');
+  });
+
+  it('only allows monthly renewal inside the final 5 days or after expiry', () => {
+    const now = new Date('2026-05-12T10:00:00.000Z');
+    const farFromExpiry: Subscriber = {
+      ...subscribers[0],
+      expiryDate: '2026-05-20T10:00:00.000Z',
+    };
+    const nearExpiry: Subscriber = {
+      ...subscribers[0],
+      expiryDate: '2026-05-17T10:00:00.000Z',
+    };
+
+    expect(getDaysUntilMonthlyExpiry(farFromExpiry, now)).toBe(8);
+    expect(canRenewMonthlySubscriber(farFromExpiry, now)).toBe(false);
+    expect(getDaysUntilMonthlyExpiry(nearExpiry, now)).toBe(5);
+    expect(canRenewMonthlySubscriber(nearExpiry, now)).toBe(true);
+    expect(canRenewMonthlySubscriber(subscribers[1], now)).toBe(true);
   });
 
   it('detects conflicts against additional plates', () => {
