@@ -23,7 +23,7 @@ import { formatCurrencyARS } from '../utils/currency';
 import { toast } from 'sonner';
 
 export const Dashboard: React.FC = () => {
-  const { vehicles, stats, currentDetection, logs, searchVehicle } = useParking();
+  const { vehicles, stats, currentDetection, logs, searchVehicle, clearDetection } = useParking();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showCamera, setShowCamera] = useState(false);
@@ -35,10 +35,10 @@ export const Dashboard: React.FC = () => {
     const found = searchVehicle(plate);
     if (found) {
       toast.info(`Vehículo ${plate} encontrado — procesando salida`);
-      navigate('/exit');
+      navigate('/exit', { state: { detectedPlate: plate } });
     } else {
       toast.info(`Nueva patente ${plate} detectada — procesando ingreso`);
-      navigate('/entry');
+      navigate('/entry', { state: { detectedPlate: plate } });
     }
   };
 
@@ -197,7 +197,10 @@ export const Dashboard: React.FC = () => {
             <h2 className="font-semibold text-gray-900 mb-4">Acciones Rápidas</h2>
             <div className="space-y-2">
               <button
-                onClick={() => navigate('/entry')}
+                onClick={() => {
+                  clearDetection();
+                  navigate('/entry');
+                }}
                 className="w-full flex items-center gap-3 bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium transition-colors text-left"
               >
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -206,7 +209,10 @@ export const Dashboard: React.FC = () => {
                 Nuevo Ingreso
               </button>
               <button
-                onClick={() => navigate('/exit')}
+                onClick={() => {
+                  clearDetection();
+                  navigate('/exit');
+                }}
                 className="w-full flex items-center gap-3 bg-green-50 hover:bg-green-100 text-green-700 py-3 px-4 rounded-xl font-medium transition-colors text-left"
               >
                 <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">

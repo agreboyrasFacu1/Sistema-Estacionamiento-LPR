@@ -76,6 +76,7 @@ interface ParkingContextType {
   lprAccuracy: number | null;
   lprTargetAccuracy: number;
   simulateDetection: () => Promise<void>;
+  clearDetection: () => void;
   addVehicleEntry: (
     plate: string,
     category: VehicleCategory
@@ -287,6 +288,10 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     const detection = await simulatedLprProvider.detect();
     setCurrentDetection(detection);
     setTimeout(() => setCurrentDetection(null), 8000);
+  };
+
+  const clearDetection = () => {
+    setCurrentDetection(null);
   };
 
   const addVehicleEntry = async (
@@ -753,6 +758,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
         lprAccuracy,
         lprTargetAccuracy: TARGET_LPR_ACCURACY,
         simulateDetection,
+        clearDetection,
         addVehicleEntry,
         processPayment,
         confirmVehicleExit,

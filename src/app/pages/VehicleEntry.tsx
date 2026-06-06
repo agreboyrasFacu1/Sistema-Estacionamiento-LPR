@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import React, { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useParking } from '../contexts/ParkingContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,7 +9,6 @@ import {
   XCircle,
   AlertTriangle,
   Loader2,
-  RefreshCw,
   Car,
   Camera,
   Edit3,
@@ -23,13 +22,17 @@ import { getEffectiveSubscriberStatus } from '../domain/subscribers';
 export const VehicleEntry: React.FC = () => {
   const {
     currentDetection,
-    simulateDetection,
     addVehicleEntry,
     checkDuplicatePlate,
     getSubscriberByPlate,
   } = useParking();
   const { isTrainingMode } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeDetectedPlate =
+    typeof (location.state as { detectedPlate?: unknown } | null)?.detectedPlate === 'string'
+      ? (location.state as { detectedPlate: string }).detectedPlate
+      : '';
 
   const [selectedCategory, setSelectedCategory] = useState<VehicleCategory>('auto');
   const [manualPlate, setManualPlate] = useState('');
@@ -40,11 +43,7 @@ export const VehicleEntry: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [detectionError, setDetectionError] = useState<string | null>(null);
   const [plateError, setPlateError] = useState<string | null>(null);
-  const [confirmedPlate, setConfirmedPlate] = useState('');
-
-  useEffect(() => {
-    void simulateDetection();
-  }, []);
+  const [confirmedPlate, setConfirmedPlate] = useState(routeDetectedPlate);
 
   const getActivePlate = () => {
     if (confirmedPlate) return confirmedPlate;
@@ -90,15 +89,6 @@ export const VehicleEntry: React.FC = () => {
       setPlateError(null);
       toast.success(`Patente ${plate} detectada por cámara`);
     }
-  };
-
-  const handleNewDetection = () => {
-    void simulateDetection();
-    setIsManualEntry(false);
-    setManualPlate('');
-    setConfirmedPlate('');
-    setPlateError(null);
-    setDetectionError(null);
   };
 
   const handleConfirmEntry = async () => {
@@ -212,13 +202,6 @@ export const VehicleEntry: React.FC = () => {
                   <Camera className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={handleNewDetection}
-                  className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
-                  title="Nueva detección LPR"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-                <button
                   onClick={() => { setIsManualEntry(true); setConfirmedPlate(''); }}
                   className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
                   title="Ingreso manual"
@@ -298,13 +281,6 @@ export const VehicleEntry: React.FC = () => {
                   >
                     <Camera className="w-4 h-4" />
                     Abrir Cámara
-                  </button>
-                  <button
-                    onClick={handleNewDetection}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Detectar
                   </button>
                 </div>
               </div>
