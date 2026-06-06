@@ -293,6 +293,8 @@ function Start-DockerRuntime {
     return
   }
 
+  # @CONTEXT: APP_PORT sincroniza el puerto publico de Docker Compose con -Port.
+  $env:APP_PORT = [string]$Port
   Write-Info "La aplicacion quedara disponible en: http://localhost:${Port}/"
   Write-Info "Para cerrar Docker Compose presione Ctrl+C y luego ejecute docker compose down si hace falta."
 

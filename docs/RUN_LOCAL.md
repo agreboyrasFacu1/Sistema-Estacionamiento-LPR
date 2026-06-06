@@ -46,6 +46,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\run-local.ps1 -NoBrowser
 .\scripts\run-local.ps1 -UseCleanInstall
 .\scripts\run-local.ps1 -Runtime Node -CheckOnly
+.\scripts\run-local.ps1 -Runtime Docker -Port 5174
 ```
 
 El script elige automaticamente el runtime disponible:
@@ -57,6 +58,8 @@ El script elige automaticamente el runtime disponible:
 - `-NonInteractive`: no pregunta, no instala y falla con mensaje claro si falta algo.
 
 Si falta Node.js o Docker, el script puede ofrecer instalarlos con `winget` solo con confirmacion del usuario.
+
+Cuando se usa Docker, `-Port` cambia el puerto disponible en la maquina host. El contenedor sigue usando internamente el puerto `5173`.
 
 ## Opcion B - Docker
 
