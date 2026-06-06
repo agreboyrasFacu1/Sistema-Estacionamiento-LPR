@@ -27,6 +27,8 @@ import {
   MOCK_VEHICLES,
   MOCK_WHITE_RUN_INCIDENTS,
   PRICING_RULES,
+  SUBSCRIBER_PRICING_RULES,
+  SubscriberPricingRule,
 } from '../data/mockData';
 import { calculateDashboardStats } from '../domain/dashboard';
 import { normalizePlate } from '../domain/plates';
@@ -66,6 +68,7 @@ interface ParkingContextType {
   stats: DashboardStats;
   pricingRules: PricingRule[];
   subscribers: Subscriber[];
+  subscriberPricingRules: SubscriberPricingRule[];
   tickets: TicketOperation[];
   whiteRunIncidents: WhiteRunIncident[];
   lprCorrections: LPRCorrection[];
@@ -100,10 +103,17 @@ interface ParkingContextType {
   addPricingRule: (rule: Omit<PricingRule, 'id'>) => void;
   updatePricingRule: (rule: PricingRule) => void;
   deletePricingRule: (id: string) => void;
-  addSubscriber: (subscriber: Omit<Subscriber, 'id' | 'createdAt'>) => void;
+  addSubscriber: (
+    subscriber: Omit<Subscriber, 'id' | 'createdAt'>,
+    payment?: {
+      paymentMethod: PaymentMethod;
+      paymentBreakdown?: PaymentBreakdownItem[];
+    }
+  ) => { subscriber: Subscriber; ticket?: TicketOperation };
   updateSubscriber: (subscriber: Subscriber) => void;
   deleteSubscriber: (id: string) => void;
   getSubscriberByPlate: (plate: string) => Subscriber | undefined;
+  checkDuplicateSubscriberPlate: (plate: string) => Subscriber | undefined;
   renewSubscriberSubscription: (
     subscriberId: string,
     paymentMethod: PaymentMethod,
@@ -112,6 +122,7 @@ interface ParkingContextType {
   recordLprCorrection: (detectedPlate: string, correctedPlate: string, confidence: number) => void;
   addWhiteRunIncident: (payload: Omit<WhiteRunIncident, 'id' | 'createdAt' | 'userId' | 'status'>) => void;
   resolveWhiteRunIncident: (id: string) => void;
+  updateSubscriberPricingRule: (rule: SubscriberPricingRule) => void;
 }
 
 const ParkingContext = createContext<ParkingContextType | undefined>(undefined);
@@ -119,7 +130,7 @@ const ParkingContext = createContext<ParkingContextType | undefined>(undefined);
 export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const { user, isTrainingMode } = useAuth();
+  const { user } = useAuth();
   const [vehicles, setVehicles] = useState<VehicleEntry[]>(() =>
     loadFromStorage('vehicles', MOCK_VEHICLES)
   );
@@ -130,6 +141,9 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     useState<LPRDetection | null>(null);
   const [pricingRules, setPricingRules] = useState<PricingRule[]>(() =>
     loadFromStorage('pricing-rules', PRICING_RULES)
+  );
+  const [subscriberPricingRules, setSubscriberPricingRules] = useState<SubscriberPricingRule[]>(() =>
+    loadFromStorage('subscriber-pricing-rules', SUBSCRIBER_PRICING_RULES)
   );
   const [subscribers, setSubscribers] = useState<Subscriber[]>(() =>
     loadFromStorage('subscribers', MOCK_SUBSCRIBERS)
@@ -149,6 +163,10 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
   useEffect(
     () => saveToStorage('pricing-rules', pricingRules),
     [pricingRules]
+  );
+  useEffect(
+    () => saveToStorage('subscriber-pricing-rules', subscriberPricingRules),
+    [subscriberPricingRules]
   );
   useEffect(() => saveToStorage('subscribers', subscribers), [subscribers]);
   useEffect(() => saveToStorage('tickets', tickets), [tickets]);
@@ -365,16 +383,6 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
       return [ticket, ...withoutDuplicate];
     });
 
-    if (isTrainingMode && typeof whiteRunDifference === 'number' && whiteRunDifference !== 0) {
-      addWhiteRunIncident({
-        vehicleId,
-        licensePlate: updatedVehicle.licensePlate,
-        systemAmount: charge.amount,
-        manualAmount,
-        difference: whiteRunDifference,
-        description: 'Diferencia detectada durante marcha blanca',
-      });
-    }
 
     addLog(
       'payment',
@@ -488,22 +496,120 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     setPricingRules((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const addSubscriber = (subscriber: Omit<Subscriber, 'id' | 'createdAt'>) => {
+  const checkDuplicateSubscriberPlate = (plate: string): Subscriber | undefined => {
+    const normalized = normalizePlate(plate);
+    // Find active subscriber with same plate
+    return subscribers.find((sub) => {
+      const subNormalized = normalizePlate(sub.licensePlate);
+      if (subNormalized !== normalized) return false;
+      // Only consider active subscriptions
+      if (sub.type === 'monthly' && sub.expiryDate) {
+        return new Date(sub.expiryDate) > new Date();
+      }
+      return true;
+    });
+  };
+
+  const getSubscriberMonthlyPrice = (subscriber: Pick<Subscriber, 'category'>): number => {
+    const category = subscriber.category || 'auto';
+    return (
+      subscriberPricingRules.find((rule) => rule.category === category)?.monthlyPrice ||
+      subscriberPricingRules[0]?.monthlyPrice ||
+      MONTHLY_SUBSCRIPTION_AMOUNT_ARS
+    );
+  };
+
+  const addSubscriber = (
+    subscriber: Omit<Subscriber, 'id' | 'createdAt'>,
+    payment?: {
+      paymentMethod: PaymentMethod;
+      paymentBreakdown?: PaymentBreakdownItem[];
+    }
+  ): { subscriber: Subscriber; ticket?: TicketOperation } => {
+    const normalizedPlate = normalizePlate(subscriber.licensePlate);
+
+    // Check for active duplicate subscription
+    const existingSubscriber = checkDuplicateSubscriberPlate(normalizedPlate);
+    if (existingSubscriber) {
+      throw new Error(
+        `Ya existe un abono activo para la patente ${normalizedPlate}. Solo se permite uno por patente.`
+      );
+    }
+
+    const now = new Date();
+    const expiryDate = new Date(now);
+    expiryDate.setMonth(expiryDate.getMonth() + 1);
+    const amount =
+      subscriber.type === 'monthly'
+        ? getSubscriberMonthlyPrice(subscriber)
+        : subscriber.amount;
+
+    if (subscriber.type === 'monthly') {
+      if (!payment || payment.paymentMethod === 'subscriber' || payment.paymentMethod === 'no_charge') {
+        throw new Error('El alta de abono mensual requiere cobrar un medio de pago');
+      }
+    }
+
     const newSubscriber: Subscriber = {
       ...subscriber,
-      licensePlate: normalizePlate(subscriber.licensePlate),
+      licensePlate: normalizedPlate,
       additionalPlates: (subscriber.additionalPlates || []).map(normalizePlate),
+      category: subscriber.type === 'monthly' ? subscriber.category || 'auto' : subscriber.category,
       id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
+      createdAt: now.toISOString(),
+      expiryDate: subscriber.type === 'monthly' ? expiryDate.toISOString() : subscriber.expiryDate,
+      amount,
     };
+
+    const ticket =
+      subscriber.type === 'monthly' && payment
+        ? createSubscriptionRenewalTicket({
+            subscriber: newSubscriber,
+            amount: newSubscriber.amount || 0,
+            paymentMethod: payment.paymentMethod,
+            paymentBreakdown: payment.paymentBreakdown,
+            cashierId: user?.id || 'system',
+            validFrom: now.toISOString(),
+            validUntil: newSubscriber.expiryDate || expiryDate.toISOString(),
+            createdAt: now,
+          })
+        : undefined;
+
     setSubscribers((prev) => [...prev, newSubscriber]);
+    if (ticket) {
+      setTickets((prev) => [ticket, ...prev]);
+    }
+    addLog(
+      'payment',
+      `Nuevo abono creado para ${newSubscriber.licensePlate} por ${formatCurrencyARSWithCents(newSubscriber.amount || 0)}`,
+      undefined,
+      {
+        subscriberId: newSubscriber.id,
+        amount: newSubscriber.amount ?? null,
+        type: newSubscriber.type,
+        paymentMethod: payment?.paymentMethod || null,
+        ticketNumber: ticket?.ticketNumber || null,
+      }
+    );
+
+    return { subscriber: newSubscriber, ticket };
   };
 
   const updateSubscriber = (subscriber: Subscriber) => {
+    const existing = subscribers.find((item) => item.id === subscriber.id);
     const normalized: Subscriber = {
       ...subscriber,
       licensePlate: normalizePlate(subscriber.licensePlate),
       additionalPlates: (subscriber.additionalPlates || []).map(normalizePlate),
+      category: subscriber.type === 'monthly' ? subscriber.category || existing?.category || 'auto' : subscriber.category,
+      expiryDate:
+        subscriber.type === 'monthly'
+          ? existing?.expiryDate || subscriber.expiryDate
+          : subscriber.expiryDate,
+      amount:
+        subscriber.type === 'monthly'
+          ? existing?.amount || getSubscriberMonthlyPrice(subscriber)
+          : subscriber.amount,
     };
     setSubscribers((prev) =>
       prev.map((item) => (item.id === normalized.id ? normalized : item))
@@ -529,10 +635,11 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     const now = new Date();
-    const renewal = renewMonthlySubscriber(subscriber, now);
+    const amount = getSubscriberMonthlyPrice(subscriber);
+    const renewal = renewMonthlySubscriber(subscriber, now, amount);
     const ticket = createSubscriptionRenewalTicket({
       subscriber: renewal.subscriber,
-      amount: MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+      amount: renewal.amount,
       paymentMethod,
       paymentBreakdown,
       cashierId: user?.id || 'system',
@@ -616,6 +723,16 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     );
   };
 
+  const updateSubscriberPricingRule = (rule: SubscriberPricingRule) => {
+    setSubscriberPricingRules((prev) =>
+      prev.map((item) => (item.id === rule.id ? rule : item))
+    );
+    addLog('system', `Tarifa de abono actualizada para ${rule.name}`, undefined, {
+      category: rule.category,
+      monthlyPrice: rule.monthlyPrice,
+    });
+  };
+
   return (
     <ParkingContext.Provider
       value={{
@@ -624,6 +741,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
         currentDetection,
         stats,
         pricingRules,
+        subscriberPricingRules,
         subscribers,
         tickets,
         whiteRunIncidents,
@@ -646,10 +764,12 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
         updateSubscriber,
         deleteSubscriber,
         getSubscriberByPlate,
+        checkDuplicateSubscriberPlate,
         renewSubscriberSubscription,
         recordLprCorrection,
         addWhiteRunIncident,
         resolveWhiteRunIncident,
+        updateSubscriberPricingRule,
       }}
     >
       {children}

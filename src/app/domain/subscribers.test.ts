@@ -170,9 +170,9 @@ describe('subscriber domain', () => {
     expect(expiredRenewal.validFrom).toBe(now.toISOString());
     expect(expiredRenewal.subscriber.status).toBe('active');
     expect(expiredRenewal.amount).toBe(150000);
-    expect(expiredRenewal.subscriber.expiryDate).toBe('2026-06-11T10:00:00.000Z');
+    expect(expiredRenewal.subscriber.expiryDate).toBe('2026-06-12T10:00:00.000Z');
     expect(inactiveRenewal.validFrom).toBe(now.toISOString());
-    expect(inactiveRenewal.subscriber.expiryDate).toBe('2026-06-11T10:00:00.000Z');
+    expect(inactiveRenewal.subscriber.expiryDate).toBe('2026-06-12T10:00:00.000Z');
   });
 
   it('renews active future monthly subscribers from their current expiry', () => {
@@ -180,8 +180,8 @@ describe('subscriber domain', () => {
     const renewal = renewMonthlySubscriber(subscribers[0], now);
 
     expect(renewal.validFrom).toBe('2026-12-31T00:00:00.000Z');
-    expect(renewal.validUntil).toBe('2027-01-30T00:00:00.000Z');
-    expect(renewal.subscriber.expiryDate).toBe('2027-01-30T00:00:00.000Z');
+    expect(renewal.validUntil).toBe('2027-01-31T00:00:00.000Z');
+    expect(renewal.subscriber.expiryDate).toBe('2027-01-31T00:00:00.000Z');
   });
 
   it('detects conflicts against additional plates', () => {

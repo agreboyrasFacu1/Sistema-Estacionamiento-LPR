@@ -78,10 +78,12 @@ export interface Subscriber {
   phone: string;
   licensePlate: string;
   additionalPlates?: string[];
+  category?: VehicleCategory;
   type: SubscriberType;
   status: SubscriberStatus;
   expiryDate?: string; // ISO date for monthly
   discount?: number; // percentage 0-100
+  amount?: number; // subscription cost in ARS
   createdAt: string;
   notes?: string;
 }

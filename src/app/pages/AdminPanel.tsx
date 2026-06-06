@@ -62,7 +62,18 @@ const createEmptyRule = (category: VehicleCategory = 'auto'): Omit<PricingRule, 
 });
 
 export const AdminPanel: React.FC = () => {
-  const { logs, stats, vehicles, pricingRules, lprCorrections, addPricingRule, updatePricingRule, deletePricingRule } = useParking();
+  const {
+    logs,
+    stats,
+    vehicles,
+    pricingRules,
+    subscriberPricingRules,
+    lprCorrections,
+    addPricingRule,
+    updatePricingRule,
+    deletePricingRule,
+    updateSubscriberPricingRule,
+  } = useParking();
   const [activeTab, setActiveTab] = useState<TabType>('pricing');
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
@@ -120,6 +131,17 @@ export const AdminPanel: React.FC = () => {
       category,
       ...(!editingRule ? PRICING_DEFAULTS[category] : {}),
     });
+  };
+
+  const handleSubscriberPriceChange = (ruleId: string, monthlyPrice: number) => {
+    const rule = subscriberPricingRules.find((item) => item.id === ruleId);
+    if (!rule) return;
+    updateSubscriberPricingRule({
+      ...rule,
+      monthlyPrice: Number.isFinite(monthlyPrice) && monthlyPrice >= 0 ? monthlyPrice : 0,
+    });
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   const handleResetDemoData = () => {
@@ -503,6 +525,52 @@ export const AdminPanel: React.FC = () => {
                   })}
                 </div>
               )}
+
+              <div className="mt-6">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900 mb-0.5">Valores de Abonos Mensuales</h2>
+                    <p className="text-sm text-gray-500">
+                      El alta y la renovación cobran estos importes y fijan vigencia por un mes calendario.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {subscriberPricingRules.map((rule) => {
+                    const catInfo = CATEGORIES.find((c) => c.value === rule.category);
+                    return (
+                      <div key={rule.id} className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                        <div className="flex items-center gap-2.5 mb-4">
+                          <div className="text-2xl">{catInfo?.icon}</div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{rule.name}</h3>
+                            <span className="text-xs text-gray-500 capitalize">
+                              {translateCategory(rule.category)}
+                            </span>
+                          </div>
+                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Abono mensual (ARS)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={rule.monthlyPrice}
+                          onChange={(event) =>
+                            handleSubscriberPriceChange(rule.id, parseFloat(event.target.value) || 0)
+                          }
+                          className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">
+                          Actual: {formatCurrencyARSWithCents(rule.monthlyPrice)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Billing rule notice */}
               <div className="mt-5 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">

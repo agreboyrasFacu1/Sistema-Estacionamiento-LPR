@@ -2,7 +2,7 @@ import { Subscriber, SubscriberValidity } from '../types';
 import { normalizePlate } from './plates';
 
 export const MONTHLY_SUBSCRIPTION_AMOUNT_ARS = 150000;
-export const MONTHLY_RENEWAL_DAYS = 30;
+export const MONTHLY_RENEWAL_MONTHS = 1;
 
 export interface SubscriberPlateConflict {
   plate: string;
@@ -84,7 +84,8 @@ export interface MonthlySubscriptionRenewal {
 
 export const renewMonthlySubscriber = (
   subscriber: Subscriber,
-  now: Date = new Date()
+  now: Date = new Date(),
+  amount: number = subscriber.amount || MONTHLY_SUBSCRIPTION_AMOUNT_ARS
 ): MonthlySubscriptionRenewal => {
   if (subscriber.type !== 'monthly') {
     throw new Error('Solo se pueden renovar abonados mensuales');
@@ -100,17 +101,18 @@ export const renewMonthlySubscriber = (
       ? currentExpiry
       : now;
   const validUntil = new Date(startsAt);
-  validUntil.setDate(validUntil.getDate() + MONTHLY_RENEWAL_DAYS);
+  validUntil.setMonth(validUntil.getMonth() + MONTHLY_RENEWAL_MONTHS);
 
   return {
     subscriber: {
       ...subscriber,
       status: 'active',
       expiryDate: validUntil.toISOString(),
+      amount,
     },
     validFrom: startsAt.toISOString(),
     validUntil: validUntil.toISOString(),
-    amount: MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+    amount,
   };
 };
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParking } from '../contexts/ParkingContext';
-import { PaymentBreakdownItem, PaymentMethod, Subscriber, SubscriberType, SubscriberValidity } from '../types';
+import { PaymentBreakdownItem, PaymentMethod, Subscriber, SubscriberType, SubscriberValidity, VehicleCategory } from '../types';
 import {
   findActiveSubscriberPlateConflict,
   getEffectiveSubscriberStatus,
@@ -27,6 +27,7 @@ import {
   Banknote,
   CreditCard,
   Receipt,
+  TrendingUp,
 } from 'lucide-react';
 
 const emptyForm: Omit<Subscriber, 'id' | 'createdAt'> = {
@@ -35,12 +36,18 @@ const emptyForm: Omit<Subscriber, 'id' | 'createdAt'> = {
   phone: '',
   licensePlate: '',
   additionalPlates: [],
+  category: 'auto',
   type: 'monthly',
   status: 'active',
-  expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   discount: 0,
   notes: '',
 };
+
+const CATEGORIES: { value: VehicleCategory; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'camioneta', label: 'Camioneta' },
+  { value: 'moto', label: 'Moto' },
+];
 
 export const Subscribers: React.FC = () => {
   const {
@@ -49,6 +56,7 @@ export const Subscribers: React.FC = () => {
     updateSubscriber,
     deleteSubscriber,
     renewSubscriberSubscription,
+    subscriberPricingRules,
   } = useParking();
   const [showModal, setShowModal] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscriber | null>(null);
@@ -64,6 +72,9 @@ export const Subscribers: React.FC = () => {
   const [renewalMethod, setRenewalMethod] = useState<PaymentMethod | null>(null);
   const [renewalCashAmount, setRenewalCashAmount] = useState('');
   const [renewalCardAmount, setRenewalCardAmount] = useState('');
+  const [registrationMethod, setRegistrationMethod] = useState<PaymentMethod | null>(null);
+  const [registrationCashAmount, setRegistrationCashAmount] = useState('');
+  const [registrationCardAmount, setRegistrationCardAmount] = useState('');
   const [renewalReceipt, setRenewalReceipt] = useState<{
     subscriber: Subscriber;
     ticketNumber: string;
@@ -79,10 +90,41 @@ export const Subscribers: React.FC = () => {
     createdAt: editingSub?.createdAt || new Date().toISOString(),
     licensePlate: formData.licensePlate.toUpperCase(),
     additionalPlates: (formData.additionalPlates || []).map((p) => p.toUpperCase()),
-    expiryDate: formData.type === 'monthly' && formData.expiryDate
-      ? new Date(formData.expiryDate).toISOString()
+    expiryDate: formData.type === 'monthly'
+      ? new Date().toISOString()
       : undefined,
   });
+
+  const getMonthlyPrice = (category: VehicleCategory = formData.category || 'auto'): number =>
+    subscriberPricingRules.find((rule) => rule.category === category)?.monthlyPrice ||
+    subscriberPricingRules[0]?.monthlyPrice ||
+    MONTHLY_SUBSCRIPTION_AMOUNT_ARS;
+
+  const getRegistrationBreakdown = (): PaymentBreakdownItem[] => [
+    { method: 'cash', amount: Number(registrationCashAmount) || 0 },
+    { method: 'card', amount: Number(registrationCardAmount) || 0 },
+  ];
+
+  const getRegistrationMixedError = (): string | null => {
+    if (registrationMethod !== 'mixed' || formData.type !== 'monthly') return null;
+    const breakdown = getRegistrationBreakdown();
+    if (breakdown.some((item) => item.amount < 0)) {
+      return 'Los montos no pueden ser negativos';
+    }
+    const total = breakdown.reduce((sum, item) => sum + item.amount, 0);
+    const expectedAmount = getMonthlyPrice();
+    if (total !== expectedAmount) {
+      return `La suma debe coincidir con ${formatCurrencyARSWithCents(expectedAmount)}`;
+    }
+    return null;
+  };
+
+  const canChargeRegistration = (): boolean => {
+    if (editingSub || formData.type !== 'monthly') return true;
+    if (!registrationMethod) return false;
+    if (registrationMethod !== 'mixed') return true;
+    return getRegistrationMixedError() === null;
+  };
 
   const validate = (): boolean => {
     const e: Record<string, string | undefined> = {};
@@ -92,11 +134,15 @@ export const Subscribers: React.FC = () => {
     else if (!/^([A-Z]{3}\d{3}|[A-Z]{2}\d{3}[A-Z]{2})$/.test(formData.licensePlate.toUpperCase())) {
       e.licensePlate = 'Formato inválido (ABC123 o AB123CD)';
     }
-    if (formData.type === 'monthly' && !formData.expiryDate) e.expiryDate = 'La fecha de vencimiento es requerida';
     if (formData.type === 'discounted' && (!formData.discount || formData.discount <= 0)) {
       e.discount = 'El descuento debe ser mayor a 0';
     }
-    if (!e.licensePlate && !e.expiryDate) {
+    if (!canChargeRegistration()) {
+      e.payment = registrationMethod === 'mixed'
+        ? getRegistrationMixedError() || 'Revise el pago mixto'
+        : 'El alta mensual requiere cobrar un medio de pago';
+    }
+    if (!e.licensePlate) {
       const conflict = findActiveSubscriberPlateConflict(
         subscribers,
         buildSubscriberCandidate()
@@ -111,8 +157,11 @@ export const Subscribers: React.FC = () => {
 
   const openAddModal = () => {
     setEditingSub(null);
-    setFormData({ ...emptyForm, expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
+    setFormData({ ...emptyForm });
     setAdditionalPlateInput('');
+    setRegistrationMethod(null);
+    setRegistrationCashAmount('');
+    setRegistrationCardAmount('');
     setErrors({});
     setShowModal(true);
   };
@@ -125,6 +174,7 @@ export const Subscribers: React.FC = () => {
       phone: sub.phone,
       licensePlate: sub.licensePlate,
       additionalPlates: sub.additionalPlates || [],
+      category: sub.category || 'auto',
       type: sub.type,
       status: sub.status,
       expiryDate: sub.expiryDate ? sub.expiryDate.split('T')[0] : '',
@@ -132,6 +182,9 @@ export const Subscribers: React.FC = () => {
       notes: sub.notes || '',
     });
     setAdditionalPlateInput('');
+    setRegistrationMethod(null);
+    setRegistrationCashAmount('');
+    setRegistrationCardAmount('');
     setErrors({});
     setShowModal(true);
   };
@@ -142,14 +195,34 @@ export const Subscribers: React.FC = () => {
       ...formData,
       licensePlate: formData.licensePlate.toUpperCase(),
       additionalPlates: (formData.additionalPlates || []).map((p) => p.toUpperCase()),
-      expiryDate: formData.type === 'monthly' && formData.expiryDate
-        ? new Date(formData.expiryDate).toISOString()
+      category: formData.type === 'monthly' ? formData.category || 'auto' : formData.category,
+      expiryDate: formData.type === 'monthly' && editingSub?.expiryDate
+        ? editingSub.expiryDate
         : undefined,
     };
     if (editingSub) {
       updateSubscriber({ ...payload, id: editingSub.id, createdAt: editingSub.createdAt });
     } else {
-      addSubscriber(payload);
+      const result = addSubscriber(
+        payload,
+        payload.type === 'monthly' && registrationMethod
+          ? {
+              paymentMethod: registrationMethod,
+              paymentBreakdown:
+                registrationMethod === 'mixed' ? getRegistrationBreakdown() : undefined,
+            }
+          : undefined
+      );
+      if (result.ticket) {
+        setRenewalReceipt({
+          subscriber: result.subscriber,
+          ticketNumber: result.ticket.ticketNumber,
+          validUntil: result.subscriber.expiryDate || result.ticket.validUntil || '',
+          amount: result.ticket.amount,
+          paymentMethod: result.ticket.paymentMethod,
+          paymentBreakdown: result.ticket.paymentBreakdown,
+        });
+      }
     }
     setShowModal(false);
     setSavedSuccess(true);
@@ -190,14 +263,15 @@ export const Subscribers: React.FC = () => {
   ];
 
   const getRenewalMixedError = (): string | null => {
-    if (renewalMethod !== 'mixed') return null;
+    if (renewalMethod !== 'mixed' || !payingSubscriber) return null;
     const breakdown = getRenewalBreakdown();
     if (breakdown.some((item) => item.amount < 0)) {
       return 'Los montos no pueden ser negativos';
     }
     const total = breakdown.reduce((sum, item) => sum + item.amount, 0);
-    if (total !== MONTHLY_SUBSCRIPTION_AMOUNT_ARS) {
-      return `La suma debe coincidir con ${formatCurrencyARSWithCents(MONTHLY_SUBSCRIPTION_AMOUNT_ARS)}`;
+    const expectedAmount = getMonthlyPrice(payingSubscriber.category || 'auto');
+    if (total !== expectedAmount) {
+      return `La suma debe coincidir con ${formatCurrencyARSWithCents(expectedAmount)}`;
     }
     return null;
   };
@@ -304,19 +378,19 @@ export const Subscribers: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-5">
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <p className="font-semibold text-gray-900">{payingSubscriber.name}</p>
-                <p className="text-xs text-gray-500 font-mono">{payingSubscriber.licensePlate}</p>
-                <div className="flex items-center justify-between pt-3 mt-3 border-t border-blue-200">
-                  <span className="text-sm text-gray-600">Abono mensual interno</span>
-                  <span className="text-xl font-bold text-blue-700">
-                    {formatCurrencyARSWithCents(MONTHLY_SUBSCRIPTION_AMOUNT_ARS)}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Ticket interno no fiscal. La vigencia se extiende 30 dias.
-                </p>
-              </div>
+               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                 <p className="font-semibold text-gray-900">{payingSubscriber.name}</p>
+                 <p className="text-xs text-gray-500 font-mono">{payingSubscriber.licensePlate}</p>
+                 <div className="flex items-center justify-between pt-3 mt-3 border-t border-blue-200">
+                   <span className="text-sm text-gray-600">Abono mensual</span>
+                   <span className="text-xl font-bold text-blue-700">
+                     {formatCurrencyARSWithCents(getMonthlyPrice(payingSubscriber.category || 'auto'))}
+                   </span>
+                 </div>
+                 <p className="text-xs text-gray-500 mt-1">
+                  Ticket interno no fiscal. La vigencia se extiende un mes calendario.
+                 </p>
+               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Medio de pago</label>
@@ -477,12 +551,12 @@ export const Subscribers: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, type: 'monthly' })}
+                  onClick={() => setFormData({ ...formData, type: 'monthly' })}
                     className={`p-3 rounded-xl border-2 text-center transition-all ${formData.type === 'monthly' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
                   >
                     <Calendar className={`w-6 h-6 mx-auto mb-1 ${formData.type === 'monthly' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <div className="text-sm font-medium text-gray-900">Mensual</div>
-                    <div className="text-xs text-gray-500">Sin cargo mensual</div>
+                    <div className="text-xs text-gray-500">Cobro mensual fijo</div>
                   </button>
                   <button
                     type="button"
@@ -560,11 +634,128 @@ export const Subscribers: React.FC = () => {
 
               {/* Type-specific fields */}
               {formData.type === 'monthly' ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha de Vencimiento</label>
-                  <input type="date" value={formData.expiryDate || ''} onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 ${errors.expiryDate ? 'border-red-400' : 'border-gray-300'}`} />
-                  {errors.expiryDate && <p className="text-xs text-red-600 mt-1">{errors.expiryDate}</p>}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Categoría del Abono</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {CATEGORIES.map((category) => (
+                        <button
+                          key={category.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, category: category.value })}
+                          className={`py-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                            formData.category === category.value
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          {category.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Valor mensual</span>
+                      <span className="text-lg font-bold text-blue-700">
+                        {formatCurrencyARSWithCents(getMonthlyPrice())}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 mt-2 border-t border-blue-200">
+                      <span className="text-xs text-gray-500">Vencimiento</span>
+                      <span className="text-xs font-medium text-gray-700">
+                        {editingSub?.expiryDate
+                          ? new Date(editingSub.expiryDate).toLocaleDateString('es-CL')
+                          : new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString('es-CL')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-700 mt-2">
+                      La fecha la fija el sistema por un mes calendario y no se puede editar.
+                    </p>
+                  </div>
+
+                  {!editingSub && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">Cobro del alta</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRegistrationMethod('cash');
+                            setRegistrationCashAmount('');
+                            setRegistrationCardAmount('');
+                          }}
+                          className={`p-3 rounded-xl border-2 transition-all text-center ${registrationMethod === 'cash' ? 'border-green-600 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+                        >
+                          <Banknote className={`w-6 h-6 mx-auto mb-1 ${registrationMethod === 'cash' ? 'text-green-600' : 'text-gray-400'}`} />
+                          <div className="text-xs font-semibold text-gray-900">Efectivo</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRegistrationMethod('card');
+                            setRegistrationCashAmount('');
+                            setRegistrationCardAmount('');
+                          }}
+                          className={`p-3 rounded-xl border-2 transition-all text-center ${registrationMethod === 'card' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                        >
+                          <CreditCard className={`w-6 h-6 mx-auto mb-1 ${registrationMethod === 'card' ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <div className="text-xs font-semibold text-gray-900">Tarjeta</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRegistrationMethod('mixed')}
+                          className={`p-3 rounded-xl border-2 transition-all text-center ${registrationMethod === 'mixed' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}
+                        >
+                          <div className="flex justify-center gap-0.5 mb-1">
+                            <Banknote className={`w-4 h-4 ${registrationMethod === 'mixed' ? 'text-purple-600' : 'text-gray-400'}`} />
+                            <CreditCard className={`w-4 h-4 ${registrationMethod === 'mixed' ? 'text-purple-600' : 'text-gray-400'}`} />
+                          </div>
+                          <div className="text-xs font-semibold text-gray-900">Mixto</div>
+                        </button>
+                      </div>
+
+                      {registrationMethod === 'mixed' && (
+                        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-3 mt-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Efectivo (ARS)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={registrationCashAmount}
+                                onChange={(event) => setRegistrationCashAmount(event.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Tarjeta (ARS)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={registrationCardAmount}
+                                onChange={(event) => setRegistrationCardAmount(event.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                          {getRegistrationMixedError() ? (
+                            <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                              {getRegistrationMixedError()}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
+                              Desglose correcto.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {errors.payment && <p className="text-xs text-red-600 mt-2">{errors.payment}</p>}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -602,7 +793,11 @@ export const Subscribers: React.FC = () => {
 
             <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
               <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium transition-colors">Cancelar</button>
-              <button onClick={handleSave} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors">
+              <button
+                onClick={handleSave}
+                disabled={!canChargeRegistration()}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors"
+              >
                 <Save className="w-4 h-4" />
                 {editingSub ? 'Guardar' : 'Crear Abonado'}
               </button>
@@ -666,148 +861,358 @@ export const Subscribers: React.FC = () => {
       </div>
 
       {/* Filters + Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center gap-4 p-5 border-b border-gray-200 flex-wrap">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nombre, patente o email..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <div className="space-y-6">
+        {/* Search Bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center gap-4 p-5 border-b border-gray-200 flex-wrap">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por nombre, patente o email..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value as 'all' | SubscriberType)}
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="all">Todos los tipos</option>
+              <option value="monthly">Mensual</option>
+              <option value="discounted">Bonificado</option>
+            </select>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as 'all' | SubscriberValidity)}
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="all">Todos los estados</option>
+              <option value="active">Activos</option>
+              <option value="expired">Vencidos</option>
+              <option value="inactive">Inactivos</option>
+            </select>
+            <button onClick={openAddModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm ml-auto">
+              <Plus className="w-4 h-4" />
+              Nuevo Abonado
+            </button>
           </div>
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value as 'all' | SubscriberType)}
-            className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="all">Todos los tipos</option>
-            <option value="monthly">Mensual</option>
-            <option value="discounted">Bonificado</option>
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as 'all' | SubscriberValidity)}
-            className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="all">Todos los estados</option>
-            <option value="active">Activos</option>
-            <option value="expired">Vencidos</option>
-            <option value="inactive">Inactivos</option>
-          </select>
-          <button onClick={openAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm ml-auto">
-            <Plus className="w-4 h-4" />
-            Nuevo Abonado
-          </button>
         </div>
 
-        <div className="divide-y divide-gray-50">
-          {filteredSubs.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <Star className="w-10 h-10 mx-auto mb-3 text-gray-200" />
-              <p className="text-sm">No se encontraron abonados</p>
+        {/* Active Subscribers */}
+        {filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'active').length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-green-200 overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-green-100 bg-green-50">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <h2 className="font-semibold text-gray-900">
+                  Abonados Activos{' '}
+                  <span className="text-gray-400 font-normal">({filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'active').length})</span>
+                </h2>
+              </div>
+              <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">Vigentes</span>
             </div>
-          ) : (
-            filteredSubs.map((sub) => {
-              const days = daysUntilExpiry(sub);
-              const expired = isExpired(sub);
-              const expiringSoon = days !== null && days <= 7 && days > 0;
-              const effectiveStatus = getEffectiveSubscriberStatus(sub);
+            <div className="divide-y divide-green-50">
+              {filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'active').map((sub) => {
+                const days = daysUntilExpiry(sub);
+                const expiringSoon = days !== null && days <= 7 && days > 0;
 
-              return (
-                <div key={sub.id} className="p-5 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg ${
-                        sub.type === 'monthly' ? 'bg-blue-600' : 'bg-amber-500'
-                      }`}>
-                        {sub.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-900">{sub.name}</span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            effectiveStatus === 'active'
-                              ? 'bg-green-100 text-green-700'
-                              : effectiveStatus === 'expired'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {effectiveStatus === 'active'
-                              ? '● Activo'
-                              : effectiveStatus === 'expired'
-                                ? '● Vencido'
-                                : '● Inactivo'}
-                          </span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
-                          </span>
-                          {expiringSoon && !expired && (
-                            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">⏰ Vence en {days}d</span>
-                          )}
+                return (
+                  <div key={sub.id} className="p-5 hover:bg-green-50/50 transition-colors border-l-4 border-green-500">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                          sub.type === 'monthly' ? 'bg-blue-600' : 'bg-amber-500'
+                        }`}>
+                          {sub.name.charAt(0)}
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <Mail className="w-3 h-3" />
-                            {sub.email}
-                          </div>
-                          {sub.phone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              {sub.phone}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 mt-2">
-                          <Car className="w-3.5 h-3.5 text-gray-400" />
-                          <div className="flex gap-1.5 flex-wrap">
-                            <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">
-                              {sub.licensePlate}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-gray-900">{sub.name}</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              ✓ Activo
                             </span>
-                            {(sub.additionalPlates || []).map((p) => (
-                              <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">
-                                {p}
-                              </span>
-                            ))}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
+                            </span>
+                            {expiringSoon && (
+                              <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">⏰ Vence en {days}d</span>
+                            )}
                           </div>
+
+                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {sub.email}
+                            </div>
+                            {sub.phone && (
+                              <div className="flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {sub.phone}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-2.5">
+                            <Car className="w-3.5 h-3.5 text-gray-400" />
+                            <div className="flex gap-1.5 flex-wrap">
+                              <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">
+                                {sub.licensePlate}
+                              </span>
+                              {(sub.additionalPlates || []).map((p) => (
+                                <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">
+                                  {p}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-6 mt-3">
+                            {sub.type === 'monthly' && sub.expiryDate && (
+                              <p className="text-xs text-gray-600">
+                                <span className="text-gray-400">Vencimiento:</span> {new Date(sub.expiryDate).toLocaleDateString('es-CL')}
+                              </p>
+                            )}
+                            {sub.amount && (
+                              <div className="flex items-center gap-1">
+                                <TrendingUp className="w-3.5 h-3.5 text-green-600" />
+                                <span className="text-xs font-semibold text-green-700">{formatCurrencyARSWithCents(sub.amount)}</span>
+                              </div>
+                            )}
+                          </div>
+                          {sub.notes && (
+                            <p className="text-xs text-gray-400 mt-1.5 italic">"{sub.notes}"</p>
+                          )}
                         </div>
-
-                        {sub.type === 'monthly' && sub.expiryDate && (
-                          <p className="text-xs text-gray-400 mt-1.5">
-                            Vencimiento: {new Date(sub.expiryDate).toLocaleDateString('es-CL')}
-                          </p>
-                        )}
-                        {sub.notes && (
-                          <p className="text-xs text-gray-400 mt-1 italic">"{sub.notes}"</p>
-                        )}
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1 ml-4">
-                      {sub.type === 'monthly' && (
-                        <button
-                          onClick={() => openRenewalModal(sub)}
-                          className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors ${
-                            effectiveStatus === 'active'
-                              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                              : 'bg-green-50 text-green-700 hover:bg-green-100'
-                          }`}
-                          title="Renovar abono mensual"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          {effectiveStatus === 'active' ? 'Renovar' : 'Cobrar'}
+                      <div className="flex items-center gap-1 ml-4">
+                        {sub.type === 'monthly' && (
+                          <button
+                            onClick={() => openRenewalModal(sub)}
+                            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100"
+                            title="Renovar abono mensual"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            Renovar
+                          </button>
+                        )}
+                        <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                          <Edit className="w-4 h-4" />
                         </button>
-                      )}
-                      <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Expired Subscribers */}
+        {filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'expired').length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-red-100 bg-red-50">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <h2 className="font-semibold text-gray-900">
+                  Abonados Vencidos{' '}
+                  <span className="text-gray-400 font-normal">({filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'expired').length})</span>
+                </h2>
+              </div>
+              <span className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium">Renovación requerida</span>
+            </div>
+            <div className="divide-y divide-red-50">
+              {filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'expired').map((sub) => {
+                return (
+                  <div key={sub.id} className="p-5 hover:bg-red-50/50 transition-colors border-l-4 border-red-500">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                          sub.type === 'monthly' ? 'bg-blue-600' : 'bg-amber-500'
+                        }`}>
+                          {sub.name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-gray-900">{sub.name}</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                              ⚠ Vencido
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {sub.email}
+                            </div>
+                            {sub.phone && (
+                              <div className="flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {sub.phone}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-2.5">
+                            <Car className="w-3.5 h-3.5 text-gray-400" />
+                            <div className="flex gap-1.5 flex-wrap">
+                              <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">
+                                {sub.licensePlate}
+                              </span>
+                              {(sub.additionalPlates || []).map((p) => (
+                                <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">
+                                  {p}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-6 mt-3">
+                            {sub.type === 'monthly' && sub.expiryDate && (
+                              <p className="text-xs text-red-700 font-medium">
+                                Vencido desde: {new Date(sub.expiryDate).toLocaleDateString('es-CL')}
+                              </p>
+                            )}
+                            {sub.amount && (
+                              <div className="flex items-center gap-1">
+                                <TrendingUp className="w-3.5 h-3.5 text-red-600" />
+                                <span className="text-xs font-semibold text-red-700">{formatCurrencyARSWithCents(sub.amount)}</span>
+                              </div>
+                            )}
+                          </div>
+                          {sub.notes && (
+                            <p className="text-xs text-gray-400 mt-1.5 italic">"{sub.notes}"</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 ml-4">
+                        {sub.type === 'monthly' && (
+                          <button
+                            onClick={() => openRenewalModal(sub)}
+                            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors bg-green-50 text-green-700 hover:bg-green-100"
+                            title="Cobrar renovación"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            Cobrar
+                          </button>
+                        )}
+                        <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Inactive Subscribers */}
+        {filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'inactive').length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <XCircle className="w-5 h-5 text-gray-600" />
+                <h2 className="font-semibold text-gray-900">
+                  Abonados Inactivos{' '}
+                  <span className="text-gray-400 font-normal">({filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'inactive').length})</span>
+                </h2>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {filteredSubs.filter(s => getEffectiveSubscriberStatus(s) === 'inactive').map((sub) => {
+                return (
+                  <div key={sub.id} className="p-5 hover:bg-gray-50/50 transition-colors border-l-4 border-gray-300">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                          sub.type === 'monthly' ? 'bg-blue-600' : 'bg-amber-500'
+                        }`}>
+                          {sub.name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-gray-900">{sub.name}</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                              ● Inactivo
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              sub.type === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {sub.type === 'monthly' ? '📅 Mensual' : `⭐ ${sub.discount}% desc.`}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {sub.email}
+                            </div>
+                            {sub.phone && (
+                              <div className="flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {sub.phone}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-2.5">
+                            <Car className="w-3.5 h-3.5 text-gray-400" />
+                            <div className="flex gap-1.5 flex-wrap">
+                              <span className="bg-gray-900 text-white text-xs font-mono px-2 py-0.5 rounded">
+                                {sub.licensePlate}
+                              </span>
+                              {(sub.additionalPlates || []).map((p) => (
+                                <span key={p} className="bg-gray-200 text-gray-700 text-xs font-mono px-2 py-0.5 rounded">
+                                  {p}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {sub.amount && (
+                            <div className="flex items-center gap-1 mt-3">
+                              <TrendingUp className="w-3.5 h-3.5 text-gray-400" />
+                              <span className="text-xs font-semibold text-gray-600">{formatCurrencyARSWithCents(sub.amount)}</span>
+                            </div>
+                          )}
+                          {sub.notes && (
+                            <p className="text-xs text-gray-400 mt-1.5 italic">"{sub.notes}"</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 ml-4">
+                        <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {filteredSubs.length === 0 && (
+          <div className="text-center py-12 text-gray-400 bg-white rounded-xl shadow-sm border border-gray-200">
+            <Star className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+            <p className="text-sm">No se encontraron abonados</p>
+          </div>
+        )}
       </div>
     </div>
   );

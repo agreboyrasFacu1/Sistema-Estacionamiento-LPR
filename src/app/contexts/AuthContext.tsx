@@ -10,10 +10,9 @@ import {
 interface AuthContextType {
   user: User | null;
   users: User[];
+  isTrainingMode: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  isTrainingMode: boolean;
-  toggleTrainingMode: () => void;
   addUser: (payload: {
     name: string;
     email: string;
@@ -41,7 +40,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const [user, setUser] = useState<User | null>(() =>
     loadFromStorage<User | null>('current-user', null)
   );
-  const [isTrainingMode, setIsTrainingMode] = useState(false);
+  const isTrainingMode = false;
+
 
   useEffect(() => {
     saveToStorage('users', users);
@@ -85,12 +85,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const logout = () => {
     setUser(null);
-    setIsTrainingMode(false);
   };
 
-  const toggleTrainingMode = () => {
-    setIsTrainingMode((prev) => !prev);
-  };
 
   const addUser = (payload: {
     name: string;
@@ -145,10 +141,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       value={{
         user,
         users,
+        isTrainingMode,
         login,
         logout,
-        isTrainingMode,
-        toggleTrainingMode,
         addUser,
         updateUser,
         deleteUser,

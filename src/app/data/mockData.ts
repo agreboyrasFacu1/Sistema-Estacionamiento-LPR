@@ -89,6 +89,38 @@ export const PRICING_RULES: PricingRule[] = [
   },
 ];
 
+export interface SubscriberPricingRule {
+  id: string;
+  category: 'auto' | 'moto' | 'camioneta';
+  name: string;
+  monthlyPrice: number; // monthly subscription cost
+  discountedBasePrice?: number; // optional discounted base price
+}
+
+export const SUBSCRIBER_PRICING_RULES: SubscriberPricingRule[] = [
+  {
+    id: '1',
+    category: 'auto',
+    name: 'Auto',
+    monthlyPrice: 150000,
+    discountedBasePrice: 5000,
+  },
+  {
+    id: '2',
+    category: 'moto',
+    name: 'Moto',
+    monthlyPrice: 100000,
+    discountedBasePrice: 3000,
+  },
+  {
+    id: '3',
+    category: 'camioneta',
+    name: 'Camioneta',
+    monthlyPrice: 150000,
+    discountedBasePrice: 5000,
+  },
+];
+
 export const MOCK_VEHICLES: VehicleEntry[] = [
   {
     id: '1',
@@ -220,6 +252,7 @@ export const MOCK_SUBSCRIBERS: Subscriber[] = [
     type: 'monthly',
     status: 'active',
     expiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    amount: 150000,
     createdAt: '2024-01-01T08:00:00Z',
     notes: 'Cliente premium, pago puntual',
   },
@@ -232,6 +265,7 @@ export const MOCK_SUBSCRIBERS: Subscriber[] = [
     type: 'monthly',
     status: 'active',
     expiryDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+    amount: 150000,
     createdAt: '2024-02-15T08:00:00Z',
   },
   {
@@ -256,6 +290,7 @@ export const MOCK_SUBSCRIBERS: Subscriber[] = [
     type: 'monthly',
     status: 'active',
     expiryDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    amount: 150000,
     createdAt: '2023-12-01T08:00:00Z',
     notes: 'Abono vencido, pendiente de renovacion',
   },

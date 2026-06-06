@@ -9,8 +9,6 @@ import {
   Search,
   Settings,
   Users,
-  GraduationCap,
-  AlertCircle,
   Star,
   Car,
 } from 'lucide-react';
@@ -20,7 +18,7 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout, isTrainingMode, toggleTrainingMode } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -100,23 +98,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {isTrainingMode && (
-              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-lg">
-                <GraduationCap className="w-4 h-4" />
-                <span className="text-xs font-medium">Modo Entrenamiento</span>
-              </div>
-            )}
-
-            <button
-              onClick={toggleTrainingMode}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                isTrainingMode
-                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {isTrainingMode ? 'Salir del Entrenamiento' : 'Modo Entrenamiento'}
-            </button>
 
             <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
               <div className="flex items-center gap-2.5">
@@ -173,21 +154,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Main Content */}
       <main className="p-6">{children}</main>
-
-      {/* Training Mode Hint */}
-      {isTrainingMode && (
-        <div className="fixed bottom-6 right-6 bg-amber-500 text-white px-4 py-3 rounded-xl shadow-lg max-w-xs z-30">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <div className="font-semibold mb-0.5">Modo Entrenamiento Activo</div>
-              <div className="text-amber-50 text-xs">
-                Todas las acciones son simuladas para propósitos de capacitación.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
