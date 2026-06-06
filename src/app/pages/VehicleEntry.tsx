@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { VehicleCategory, VehicleEntry as VehicleEntryRecord } from '../types';
 import { translateCategory, validatePlate, getCategoryIcon } from '../data/mockData';
+import { getEffectiveSubscriberStatus } from '../domain/subscribers';
 
 export const VehicleEntry: React.FC = () => {
   const {
@@ -129,6 +130,7 @@ export const VehicleEntry: React.FC = () => {
 
   const activePlate = getActivePlate();
   const subscriber = activePlate ? getSubscriberByPlate(activePlate) : null;
+  const subscriberStatus = subscriber ? getEffectiveSubscriberStatus(subscriber) : undefined;
   const scopedCategories: { value: VehicleCategory; label: string; icon: string }[] = [
     { value: 'auto', label: 'Auto', icon: '🚗' },
     { value: 'camioneta', label: 'Camioneta', icon: '🚙' },
@@ -370,7 +372,9 @@ export const VehicleEntry: React.FC = () => {
               <p className="text-sm text-amber-700 mt-1">
                 <strong>{subscriber.name}</strong> ·{' '}
                 {subscriber.type === 'monthly'
-                  ? subscriber.status === 'active' ? 'Abono mensual activo — Sin cargo' : 'Abono vencido'
+                  ? subscriberStatus === 'active'
+                    ? 'Abono mensual activo — Sin cargo'
+                    : 'Abono vencido/inactivo — corresponde cobro normal'
                   : `${subscriber.discount}% de descuento`}
               </p>
             </div>

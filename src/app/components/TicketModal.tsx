@@ -111,14 +111,35 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                 <div className="flex items-center gap-2 text-gray-600">
                   {vehicle.paymentMethod === 'cash' ? (
                     <Banknote className="w-4 h-4 text-emerald-500" />
+                  ) : vehicle.paymentMethod === 'mixed' ? (
+                    <div className="flex gap-0.5">
+                      <Banknote className="w-4 h-4 text-emerald-500" />
+                      <CreditCard className="w-4 h-4 text-indigo-500" />
+                    </div>
                   ) : (
                     <CreditCard className="w-4 h-4 text-indigo-500" />
                   )}
                   <span className="text-sm">Medio de Pago</span>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">
-                  {vehicle.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'}
+                  {vehicle.paymentMethod === 'cash'
+                    ? 'Efectivo'
+                    : vehicle.paymentMethod === 'mixed'
+                    ? 'Mixto'
+                    : 'Tarjeta'}
                 </span>
+              </div>
+            )}
+            {vehicle.paymentMethod === 'mixed' && vehicle.paymentBreakdown && (
+              <div className="py-2 border-b border-gray-100 text-xs text-gray-500 space-y-1">
+                {vehicle.paymentBreakdown.map((item) => (
+                  <div key={item.method} className="flex justify-between">
+                    <span>{item.method === 'cash' ? 'Efectivo' : 'Tarjeta'}</span>
+                    <span className="font-semibold text-gray-800">
+                      {formatCurrencyARSWithCents(item.amount)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
