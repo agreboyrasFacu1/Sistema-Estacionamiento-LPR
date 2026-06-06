@@ -49,6 +49,22 @@ npm run build
 npm audit --audit-level=high
 ```
 
+## Ejecución local rápida
+
+Windows:
+
+```powershell
+.\scripts\run-local.ps1
+```
+
+Docker:
+
+```powershell
+docker compose up --build
+```
+
+Guía completa: `docs/RUN_LOCAL.md`
+
 ## Configuracion LPR
 
 La camara intenta leer patentes con Plate Recognizer Snapshot si existe un token configurado. Cree un archivo `.env.local` a partir de `.env.example` y complete:
