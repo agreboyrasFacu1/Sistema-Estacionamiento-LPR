@@ -1,10 +1,16 @@
 // Core types for the Parking Access Control System.
 
 export type UserRole = 'cashier' | 'admin';
-export type PaymentMethod = 'cash' | 'card' | 'subscriber' | 'no_charge';
+export type PaymentMethod = 'cash' | 'card' | 'mixed' | 'subscriber' | 'no_charge';
+export type PaymentBreakdownMethod = 'cash' | 'card';
 export type SubscriberType = 'monthly' | 'discounted';
 export type SubscriberStatus = 'active' | 'inactive';
 export type SubscriberValidity = 'active' | 'expired' | 'inactive';
+
+export interface PaymentBreakdownItem {
+  method: PaymentBreakdownMethod;
+  amount: number;
+}
 
 export interface User {
   id: string;
@@ -49,6 +55,7 @@ export interface VehicleEntry {
   subscriberValidity?: SubscriberValidity;
   status: StayStatus;
   ticketNumber?: string;
+  paymentBreakdown?: PaymentBreakdownItem[];
   whiteRunManualAmount?: number;
   whiteRunDifference?: number;
 }
@@ -119,15 +126,22 @@ export interface LPRCorrection {
 export interface TicketOperation {
   id: string;
   ticketNumber: string;
+  operationType?: 'parking_stay' | 'subscription_renewal';
   vehicleId: string;
   licensePlate: string;
-  category: VehicleCategory;
+  category?: VehicleCategory;
   entryTime: string;
   paidAt: string;
   exitTime?: string;
   duration: number;
   amount: number;
   paymentMethod: PaymentMethod;
+  paymentBreakdown?: PaymentBreakdownItem[];
+  subscriberId?: string;
+  subscriberName?: string;
+  validFrom?: string;
+  validUntil?: string;
+  isFiscal?: false;
   cashierId: string;
   createdAt: string;
 }
