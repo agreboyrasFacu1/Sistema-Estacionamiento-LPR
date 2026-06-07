@@ -19,6 +19,7 @@ import {
   Star,
 } from 'lucide-react';
 import { formatDuration, translateCategory, getCategoryIcon } from '../data/mockData';
+import { sortVehiclesByLatestEntry } from '../domain/stays';
 import { formatCurrencyARS } from '../utils/currency';
 import { toast } from 'sonner';
 
@@ -28,7 +29,9 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [showCamera, setShowCamera] = useState(false);
 
-  const activeVehicles = vehicles.filter((v) => !v.exitTime);
+  const activeVehicles = sortVehiclesByLatestEntry(
+    vehicles.filter((v) => !v.exitTime)
+  );
   const recentLogs = logs.slice(0, 6);
 
   const handleCameraPlateDetected = (plate: string) => {

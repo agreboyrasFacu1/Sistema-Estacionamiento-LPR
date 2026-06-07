@@ -4,12 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { PaymentBreakdownItem, PaymentMethod, Subscriber, SubscriberType, SubscriberValidity, VehicleCategory } from '../types';
 import {
   canRenewMonthlySubscriber,
+  findActiveSubscriberEmailConflict,
   findActiveSubscriberPlateConflict,
   getEffectiveSubscriberStatus,
   getDaysUntilMonthlyExpiry,
   MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
   MONTHLY_RENEWAL_WINDOW_DAYS,
+  normalizeSubscriberEmail,
 } from '../domain/subscribers';
+import { normalizePlate, validatePlate } from '../domain/plates';
 import { formatCurrencyARSWithCents } from '../utils/currency';
 import {
   Star,
@@ -95,10 +98,11 @@ export const Subscribers: React.FC = () => {
     ...formData,
     id: editingSub?.id || '__new__',
     createdAt: editingSub?.createdAt || new Date().toISOString(),
-    licensePlate: formData.licensePlate.toUpperCase(),
-    additionalPlates: (formData.additionalPlates || []).map((p) => p.toUpperCase()),
+    email: normalizeSubscriberEmail(formData.email),
+    licensePlate: normalizePlate(formData.licensePlate),
+    additionalPlates: (formData.additionalPlates || []).map(normalizePlate),
     expiryDate: formData.type === 'monthly'
-      ? new Date().toISOString()
+      ? editingSub?.expiryDate
       : undefined,
   });
 
@@ -135,11 +139,38 @@ export const Subscribers: React.FC = () => {
 
   const validate = (): boolean => {
     const e: Record<string, string | undefined> = {};
+    const normalizedMainPlate = normalizePlate(formData.licensePlate);
+    const normalizedAdditionalPlates = (formData.additionalPlates || []).map(normalizePlate);
+    const pendingAdditionalPlate = normalizePlate(additionalPlateInput);
+
     if (!formData.name.trim()) e.name = 'El nombre es requerido';
     if (!formData.email.trim()) e.email = 'El correo es requerido';
     if (!formData.licensePlate.trim()) e.licensePlate = 'La patente es requerida';
-    else if (!/^([A-Z]{3}\d{3}|[A-Z]{2}\d{3}[A-Z]{2})$/.test(formData.licensePlate.toUpperCase())) {
+    else if (!validatePlate(normalizedMainPlate)) {
       e.licensePlate = 'Formato inválido (ABC123 o AB123CD)';
+    }
+    const invalidAdditionalPlate = normalizedAdditionalPlates.find(
+      (plate) => !validatePlate(plate)
+    );
+    if (invalidAdditionalPlate) {
+      e.additionalPlate = `Formato inválido en patente adicional ${invalidAdditionalPlate}`;
+    }
+    if (
+      !e.additionalPlate &&
+      normalizedAdditionalPlates.some((plate) => plate === normalizedMainPlate)
+    ) {
+      e.additionalPlate = 'La patente adicional no puede repetir la patente principal';
+    }
+    if (!e.additionalPlate) {
+      const uniqueAdditionalPlates = new Set(normalizedAdditionalPlates);
+      if (uniqueAdditionalPlates.size !== normalizedAdditionalPlates.length) {
+        e.additionalPlate = 'No se puede repetir una patente adicional';
+      }
+    }
+    if (!e.additionalPlate && pendingAdditionalPlate) {
+      e.additionalPlate = validatePlate(pendingAdditionalPlate)
+        ? 'Agregue la patente adicional con el botón + o borre el campo antes de guardar'
+        : 'Formato inválido en la patente adicional pendiente';
     }
     if (formData.type === 'discounted' && (!formData.discount || formData.discount <= 0)) {
       e.discount = 'El descuento debe ser mayor a 0';
@@ -149,13 +180,22 @@ export const Subscribers: React.FC = () => {
         ? getRegistrationMixedError() || 'Revise el pago mixto'
         : 'El alta mensual requiere cobrar un medio de pago';
     }
-    if (!e.licensePlate) {
+    if (!e.licensePlate && !e.additionalPlate) {
       const conflict = findActiveSubscriberPlateConflict(
         subscribers,
         buildSubscriberCandidate()
       );
       if (conflict) {
         e.licensePlate = `Ya existe un abono activo/vigente para la patente ${conflict.plate} (${conflict.subscriber.name})`;
+      }
+    }
+    if (!e.email) {
+      const conflict = findActiveSubscriberEmailConflict(
+        subscribers,
+        buildSubscriberCandidate()
+      );
+      if (conflict) {
+        e.email = `Ya existe un abono activo para ${conflict.subscriber.name} con este email`;
       }
     }
     setErrors(e);
@@ -200,8 +240,9 @@ export const Subscribers: React.FC = () => {
     if (!validate()) return;
     const basePayload = {
       ...formData,
-      licensePlate: formData.licensePlate.toUpperCase(),
-      additionalPlates: (formData.additionalPlates || []).map((p) => p.toUpperCase()),
+      email: normalizeSubscriberEmail(formData.email),
+      licensePlate: normalizePlate(formData.licensePlate),
+      additionalPlates: (formData.additionalPlates || []).map(normalizePlate),
       category: formData.type === 'monthly' ? formData.category || 'auto' : formData.category,
       expiryDate: formData.type === 'monthly' && editingSub?.expiryDate
         ? editingSub.expiryDate
@@ -212,36 +253,46 @@ export const Subscribers: React.FC = () => {
         ? {
             ...basePayload,
             type: editingSub.type,
-            status: editingSub.status,
+            status: formData.status,
             category: editingSub.category,
             discount: editingSub.discount,
             amount: editingSub.amount,
             expiryDate: editingSub.expiryDate,
           }
         : basePayload;
-    if (editingSub) {
-      updateSubscriber({ ...payload, id: editingSub.id, createdAt: editingSub.createdAt });
-    } else {
-      const result = addSubscriber(
-        payload,
-        payload.type === 'monthly' && registrationMethod
-          ? {
-              paymentMethod: registrationMethod,
-              paymentBreakdown:
-                registrationMethod === 'mixed' ? getRegistrationBreakdown() : undefined,
-            }
-          : undefined
-      );
-      if (result.ticket) {
-        setRenewalReceipt({
-          subscriber: result.subscriber,
-          ticketNumber: result.ticket.ticketNumber,
-          validUntil: result.subscriber.expiryDate || result.ticket.validUntil || '',
-          amount: result.ticket.amount,
-          paymentMethod: result.ticket.paymentMethod,
-          paymentBreakdown: result.ticket.paymentBreakdown,
-        });
+    try {
+      if (editingSub) {
+        updateSubscriber({ ...payload, id: editingSub.id, createdAt: editingSub.createdAt });
+      } else {
+        const result = addSubscriber(
+          payload,
+          payload.type === 'monthly' && registrationMethod
+            ? {
+                paymentMethod: registrationMethod,
+                paymentBreakdown:
+                  registrationMethod === 'mixed' ? getRegistrationBreakdown() : undefined,
+              }
+            : undefined
+        );
+        if (result.ticket) {
+          setRenewalReceipt({
+            subscriber: result.subscriber,
+            ticketNumber: result.ticket.ticketNumber,
+            validUntil: result.subscriber.expiryDate || result.ticket.validUntil || '',
+            amount: result.ticket.amount,
+            paymentMethod: result.ticket.paymentMethod,
+            paymentBreakdown: result.ticket.paymentBreakdown,
+          });
+        }
       }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo guardar el abonado';
+      setErrors({
+        ...errors,
+        [message.toLowerCase().includes('patente') ? 'licensePlate' : 'email']: message,
+      });
+      return;
     }
     setShowModal(false);
     setSavedSuccess(true);
@@ -254,10 +305,21 @@ export const Subscribers: React.FC = () => {
   };
 
   const handleAddPlate = () => {
-    const plate = additionalPlateInput.toUpperCase().trim();
+    const plate = normalizePlate(additionalPlateInput);
     if (!plate) return;
-    if (!/^([A-Z]{3}\d{3}|[A-Z]{2}\d{3}[A-Z]{2})$/.test(plate)) {
-      setErrors({ ...errors, additionalPlate: 'Formato inválido' });
+    if (!validatePlate(plate)) {
+      setErrors({ ...errors, additionalPlate: 'Formato inválido (ABC123 o AB123CD)' });
+      return;
+    }
+    if (plate === normalizePlate(formData.licensePlate)) {
+      setErrors({
+        ...errors,
+        additionalPlate: 'La patente adicional no puede repetir la patente principal',
+      });
+      return;
+    }
+    if ((formData.additionalPlates || []).map(normalizePlate).includes(plate)) {
+      setErrors({ ...errors, additionalPlate: 'Esta patente adicional ya fue agregada' });
       return;
     }
     setFormData({ ...formData, additionalPlates: [...(formData.additionalPlates || []), plate] });
@@ -816,7 +878,7 @@ export const Subscribers: React.FC = () => {
               )}
 
               {/* Status */}
-              {isAdmin && (
+              {editingSub && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
                 <div className="flex gap-3">
@@ -1039,22 +1101,20 @@ export const Subscribers: React.FC = () => {
                             className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                             title={
                               canRenewMonthlySubscriber(sub)
-                                ? 'Renovar abono mensual'
+                                ? 'Cobrar renovacion de abono mensual'
                                 : `Disponible cuando falten ${MONTHLY_RENEWAL_WINDOW_DAYS} dias o menos`
                             }
                           >
                             <Receipt className="w-3.5 h-3.5" />
-                            Renovar
+                            Cobrar
                           </button>
                         )}
                         <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        {isAdmin && (
-                          <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1151,21 +1211,19 @@ export const Subscribers: React.FC = () => {
                         {sub.type === 'monthly' && (
                           <button
                             onClick={() => openRenewalModal(sub)}
-                            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors bg-green-50 text-green-700 hover:bg-green-100"
-                            title="Cobrar renovación"
+                            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
+                            title="Renovar abono mensual vencido"
                           >
                             <Receipt className="w-3.5 h-3.5" />
-                            Cobrar
+                            Renovar
                           </button>
                         )}
                         <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        {isAdmin && (
-                          <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1254,11 +1312,9 @@ export const Subscribers: React.FC = () => {
                         <button onClick={() => openEditModal(sub)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        {isAdmin && (
-                          <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button onClick={() => setDeleteConfirm(sub.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>

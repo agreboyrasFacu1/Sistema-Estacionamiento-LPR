@@ -32,10 +32,10 @@ export const TicketModal: React.FC<TicketModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-hidden my-4 flex flex-col">
         {/* Header */}
-        <div className="bg-green-600 px-6 py-5 text-white">
+        <div className="bg-green-600 px-6 py-5 text-white flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -58,7 +58,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
         </div>
 
         {/* Ticket content */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           {/* Establishment header */}
           <div className="text-center mb-5 pb-4 border-b border-dashed border-gray-300">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-2">

@@ -1,5 +1,5 @@
 export const STORAGE_PREFIX = 'parking-lpr';
-export const DEMO_STORAGE_VERSION = 'p2.2-ars-demo-v1';
+export const DEMO_STORAGE_VERSION = 'p2.3-fresh-demo-vehicles-v1';
 
 export const DEMO_STORAGE_KEYS = [
   'users',
