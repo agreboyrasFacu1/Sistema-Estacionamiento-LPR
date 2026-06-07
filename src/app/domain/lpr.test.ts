@@ -9,6 +9,7 @@ import {
   forceSimulatedDetection,
   getLprAccuracySummary,
   getLprQualityStatus,
+  isLprDetectionAccepted,
   webcamDemoLprProvider,
 } from './lpr';
 import { validatePlate } from './plates';
@@ -92,6 +93,12 @@ describe('lpr demo provider', () => {
     expect(getLprQualityStatus(0.95, 100)).toBe('target_met');
   });
 
+  it('accepts automatic LPR detections only at 95% confidence or higher', () => {
+    expect(isLprDetectionAccepted('AG759LH', 0.94)).toBe(false);
+    expect(isLprDetectionAccepted('AG759LH', 0.95)).toBe(true);
+    expect(isLprDetectionAccepted('12345', 0.99)).toBe(false);
+  });
+
   it('formats accuracy values for the UI', () => {
     expect(formatLprAccuracy(null)).toBe('Sin muestra');
     expect(formatLprAccuracy(0.951)).toBe('95.1%');
@@ -153,20 +160,21 @@ describe('lpr demo provider', () => {
   });
 
   it('extracts the strongest valid plate from Plate Recognizer results', () => {
-    expect(
-      extractPlateFromPlateRecognizerResponse({
-        results: [
-          {
-            plate: 'ag759lh',
-            score: 0.87,
-            candidates: [
-              { plate: 'ag7591h', score: 0.91 },
-              { plate: 'xyz', score: 0.99 },
-            ],
-          },
-        ],
-      })
-    ).toEqual({ plate: 'AG759LH', confidence: 0.87 });
+    const result = extractPlateFromPlateRecognizerResponse({
+      results: [
+        {
+          plate: 'ag759lh',
+          score: 0.87,
+          candidates: [
+            { plate: 'ag7591h', score: 0.91 },
+            { plate: 'xyz', score: 0.99 },
+          ],
+        },
+      ],
+    });
+
+    expect(result).toEqual({ plate: 'AG759LH', confidence: 0.87 });
+    expect(isLprDetectionAccepted(result?.plate || '', result?.confidence || 0)).toBe(false);
   });
 
   it('returns null when Plate Recognizer has no supported Argentine plate format', () => {

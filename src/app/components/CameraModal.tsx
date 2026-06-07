@@ -8,9 +8,13 @@ import {
   Loader2,
   Video,
   Edit3,
+  ScanLine,
+  MoveHorizontal,
+  SunMedium,
+  Hand,
 } from 'lucide-react';
 import { useParking } from '../contexts/ParkingContext';
-import { webcamDemoLprProvider } from '../domain/lpr';
+import { TARGET_LPR_ACCURACY, webcamDemoLprProvider } from '../domain/lpr';
 import type { LprFrame } from '../domain/lpr';
 import { normalizePlate, validatePlate } from '../domain/plates';
 import { LPRDetection } from '../types';
@@ -24,6 +28,15 @@ interface CameraModalProps {
 
 type CameraState = 'initializing' | 'scanning' | 'detected' | 'error' | 'unavailable';
 type CameraMode = 'webcam-demo' | 'manual-fallback';
+type ScanSignal = 'frame' | 'distance' | 'light' | 'steady';
+
+const getLowConfidenceSignal = (confidence: number): ScanSignal => {
+  const percent = Math.round(confidence * 100);
+
+  if (percent < 70) return 'light';
+  if (percent < 85) return 'distance';
+  return 'steady';
+};
 
 const canvasToBlob = (canvas: HTMLCanvasElement, quality = 0.95): Promise<Blob | null> =>
   new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
@@ -125,6 +138,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [scanSignal, setScanSignal] = useState<ScanSignal>('frame');
   const [isReadingFrame, setIsReadingFrame] = useState(false);
   const [dots, setDots] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -182,6 +196,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     setDetection(null);
     setCorrectedPlate('');
     setErrorMessage('');
+    setScanSignal('frame');
     setIsReadingFrame(false);
     resetStableDetection();
 
@@ -235,8 +250,26 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       }
 
       const nextDetection = await webcamDemoLprProvider.detectFromFrame(frame);
+      if (!nextDetection.isValid) {
+        setDetection(null);
+        setCorrectedPlate('');
+        setCameraState('scanning');
+        setErrorMessage('');
+        setScanSignal(getLowConfidenceSignal(nextDetection.confidence));
+        resetStableDetection();
+        if (captureMode === 'webcam-demo') {
+          scheduleAutomaticScan(650);
+          return;
+        }
+        setCameraState('detected');
+        setErrorMessage(
+          `La lectura no alcanzo el minimo de ${Math.round(TARGET_LPR_ACCURACY * 100)}% de confianza. Intente nuevamente o ingrese la patente manualmente.`
+        );
+        return;
+      }
       if (captureMode === 'webcam-demo' && !confirmStableDetection(nextDetection)) {
         setCameraState('scanning');
+        setScanSignal('steady');
         scheduleAutomaticScan(650);
         return;
       }
@@ -247,6 +280,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       if (captureMode === 'webcam-demo') {
         setCameraState('scanning');
         setErrorMessage('');
+        setScanSignal('frame');
         scheduleAutomaticScan(900);
         return;
       }
@@ -280,6 +314,12 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
     const detectedPlate = detection?.plate || plate;
     const confidence = detection?.confidence ?? 1;
+    if (detection && confidence < TARGET_LPR_ACCURACY) {
+      setErrorMessage(
+        `La lectura no alcanzo el minimo de ${Math.round(TARGET_LPR_ACCURACY * 100)}% de confianza. Ingrese la patente manualmente para continuar.`
+      );
+      return;
+    }
     recordLprCorrection(detectedPlate, plate, confidence);
     onPlateDetected(plate);
     cleanup();
@@ -295,6 +335,10 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
   const confidence = detection ? Math.round(detection.confidence * 100) : 0;
   const sourceLabel = mode === 'webcam-demo' ? 'Camara LPR' : 'Manual';
+  const signalClass = (signal: ScanSignal) =>
+    scanSignal === signal
+      ? 'border-blue-300 bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+      : 'border-white/20 bg-black/55 text-white/65';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -330,6 +374,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
               setDetection(null);
               setCorrectedPlate('');
               setErrorMessage('');
+              setScanSignal('frame');
               setIsReadingFrame(false);
               resetStableDetection();
             }}
@@ -364,7 +409,16 @@ export const CameraModal: React.FC<CameraModalProps> = ({
           <canvas ref={canvasRef} className="hidden" />
           <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.2)_1px,transparent_1px)] bg-[length:40px_40px] opacity-30" />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className={`border-2 ${cameraState === 'detected' ? 'border-green-400' : 'border-blue-400/70'} rounded w-56 h-20 transition-all`} />
+            <div className={`relative border-2 ${cameraState === 'detected' ? 'border-green-400' : 'border-blue-400/70'} rounded w-64 h-24 transition-all`}>
+              <div className="absolute -left-8 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[10px] border-l-[14px] border-y-transparent border-l-blue-300/90" />
+              <div className="absolute -right-8 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[10px] border-r-[14px] border-y-transparent border-r-blue-300/90" />
+              <div className="absolute -top-7 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[10px] border-t-[14px] border-x-transparent border-t-blue-300/90" />
+              <div className="absolute -bottom-7 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[10px] border-b-[14px] border-x-transparent border-b-blue-300/90" />
+              <div className="absolute -left-1 -top-1 h-5 w-5 border-l-4 border-t-4 border-blue-300" />
+              <div className="absolute -right-1 -top-1 h-5 w-5 border-r-4 border-t-4 border-blue-300" />
+              <div className="absolute -bottom-1 -left-1 h-5 w-5 border-b-4 border-l-4 border-blue-300" />
+              <div className="absolute -bottom-1 -right-1 h-5 w-5 border-b-4 border-r-4 border-blue-300" />
+            </div>
           </div>
 
           {cameraState === 'initializing' && (
@@ -378,6 +432,36 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             <div className="absolute inset-0 flex flex-col items-center justify-end p-4">
               <div className="absolute top-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-green-300">
                 {sourceLabel}
+              </div>
+              <div className="absolute top-3 right-3 flex gap-2">
+                <div
+                  className={`rounded-lg border p-2 transition-colors ${signalClass('frame')}`}
+                  title="Encuadre"
+                  aria-label="Encuadre"
+                >
+                  <ScanLine className="h-4 w-4" />
+                </div>
+                <div
+                  className={`rounded-lg border p-2 transition-colors ${signalClass('distance')}`}
+                  title="Distancia"
+                  aria-label="Distancia"
+                >
+                  <MoveHorizontal className="h-4 w-4" />
+                </div>
+                <div
+                  className={`rounded-lg border p-2 transition-colors ${signalClass('light')}`}
+                  title="Luz"
+                  aria-label="Luz"
+                >
+                  <SunMedium className="h-4 w-4" />
+                </div>
+                <div
+                  className={`rounded-lg border p-2 transition-colors ${signalClass('steady')}`}
+                  title="Estabilidad"
+                  aria-label="Estabilidad"
+                >
+                  <Hand className="h-4 w-4" />
+                </div>
               </div>
               <div className="rounded-full bg-black/70 px-4 py-1.5 text-xs font-medium tracking-wider text-blue-200">
                 {isReadingFrame ? `LEYENDO PATENTE${'.'.repeat(dots)}` : `LECTURA AUTOMATICA ACTIVA${'.'.repeat(dots)}`}
@@ -405,6 +489,26 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             </div>
           )}
         </div>
+
+        {mode === 'webcam-demo' && cameraState === 'scanning' && (
+          <div className="mx-6 mt-3 flex items-center justify-center gap-3">
+            <div className={`rounded-full border p-2 ${scanSignal === 'frame' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400'}`}>
+              <ScanLine className="h-5 w-5" />
+            </div>
+            <div className={`h-0.5 w-8 ${scanSignal === 'distance' ? 'bg-blue-500' : 'bg-gray-200'}`} />
+            <div className={`rounded-full border p-2 ${scanSignal === 'distance' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400'}`}>
+              <MoveHorizontal className="h-5 w-5" />
+            </div>
+            <div className={`h-0.5 w-8 ${scanSignal === 'light' ? 'bg-blue-500' : 'bg-gray-200'}`} />
+            <div className={`rounded-full border p-2 ${scanSignal === 'light' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400'}`}>
+              <SunMedium className="h-5 w-5" />
+            </div>
+            <div className={`h-0.5 w-8 ${scanSignal === 'steady' ? 'bg-blue-500' : 'bg-gray-200'}`} />
+            <div className={`rounded-full border p-2 ${scanSignal === 'steady' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400'}`}>
+              <Hand className="h-5 w-5" />
+            </div>
+          </div>
+        )}
 
         {(cameraState === 'detected' || mode === 'manual-fallback') && (
           <div className="mx-6 mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4">

@@ -24,6 +24,12 @@ const SIMULATED_PLATES = [
 
 export const TARGET_LPR_ACCURACY = 0.95;
 
+export const isLprDetectionAccepted = (
+  plate: string,
+  confidence: number,
+  targetAccuracy: number = TARGET_LPR_ACCURACY
+): boolean => validatePlate(plate) && confidence >= targetAccuracy;
+
 export type LprQualityStatus =
   | 'no_sample'
   | 'below_target'
@@ -376,7 +382,7 @@ export const simulatedLprProvider: LprProvider = {
       plate,
       confidence,
       timestamp: new Date().toISOString(),
-      isValid: validatePlate(plate) && confidence >= TARGET_LPR_ACCURACY,
+      isValid: isLprDetectionAccepted(plate, confidence),
       source: 'simulated',
     };
   },
@@ -390,7 +396,7 @@ export const forceSimulatedDetection = (): LPRDetection => {
     plate,
     confidence,
     timestamp: new Date().toISOString(),
-    isValid: validatePlate(plate),
+    isValid: isLprDetectionAccepted(plate, confidence),
     source: 'simulated',
   };
 };
@@ -406,7 +412,7 @@ export const webcamDemoLprProvider: LprProvider = {
         plate,
         confidence,
         timestamp: new Date().toISOString(),
-        isValid: validatePlate(plate),
+        isValid: isLprDetectionAccepted(plate, confidence),
         source: 'alpr-api',
       };
     } catch {
@@ -418,7 +424,7 @@ export const webcamDemoLprProvider: LprProvider = {
       plate,
       confidence,
       timestamp: new Date().toISOString(),
-      isValid: validatePlate(plate),
+      isValid: isLprDetectionAccepted(plate, confidence),
       source: 'camera',
     };
   },
