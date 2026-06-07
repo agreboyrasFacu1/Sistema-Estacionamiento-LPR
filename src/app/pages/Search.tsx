@@ -17,6 +17,7 @@ import {
   Gift,
 } from 'lucide-react';
 import { formatDuration, translateCategory, getCategoryIcon } from '../data/mockData';
+import { sortVehiclesByLatestEntry } from '../domain/stays';
 import { formatCurrencyARSWithCents } from '../utils/currency';
 
 export const Search: React.FC = () => {
@@ -32,7 +33,9 @@ export const Search: React.FC = () => {
       (v.ticketNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const activeVehicles = filteredVehicles.filter((v) => !v.exitTime);
+  const activeVehicles = sortVehiclesByLatestEntry(
+    filteredVehicles.filter((v) => !v.exitTime)
+  );
   const exitedVehicles = filteredVehicles.filter((v) => v.exitTime);
 
   return (

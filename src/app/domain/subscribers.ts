@@ -10,17 +10,29 @@ export interface SubscriberPlateConflict {
   subscriber: Subscriber;
 }
 
+export interface SubscriberEmailConflict {
+  email: string;
+  subscriber: Subscriber;
+}
+
+export const normalizeSubscriberEmail = (email: string): string =>
+  email.trim().toLowerCase();
+
 export const getSubscriberByPlate = (
   subscribers: Subscriber[],
   plate: string
 ): Subscriber | undefined => {
   const upperPlate = normalizePlate(plate);
   return subscribers.find(
-    (subscriber) =>
-      normalizePlate(subscriber.licensePlate) === upperPlate ||
-      (subscriber.additionalPlates || []).some(
-        (additionalPlate) => normalizePlate(additionalPlate) === upperPlate
-      )
+    (subscriber) => {
+      if (subscriber.status === 'inactive') return false;
+      return (
+        normalizePlate(subscriber.licensePlate) === upperPlate ||
+        (subscriber.additionalPlates || []).some(
+          (additionalPlate) => normalizePlate(additionalPlate) === upperPlate
+        )
+      );
+    }
   );
 };
 
@@ -174,3 +186,34 @@ export const hasActiveSubscriberPlateConflict = (
   candidate: Subscriber,
   now: Date = new Date()
 ): boolean => findActiveSubscriberPlateConflict(subscribers, candidate, now) !== null;
+
+export const findActiveSubscriberEmailConflict = (
+  subscribers: Subscriber[],
+  candidate: Subscriber,
+  now: Date = new Date()
+): SubscriberEmailConflict | null => {
+  if (getSubscriberValidity(candidate, now) !== 'active') return null;
+
+  const candidateEmail = normalizeSubscriberEmail(candidate.email);
+  if (!candidateEmail) return null;
+
+  const conflictingSubscriber = subscribers.find(
+    (subscriber) =>
+      subscriber.id !== candidate.id &&
+      getSubscriberValidity(subscriber, now) === 'active' &&
+      normalizeSubscriberEmail(subscriber.email) === candidateEmail
+  );
+
+  if (!conflictingSubscriber) return null;
+
+  return {
+    email: candidateEmail,
+    subscriber: conflictingSubscriber,
+  };
+};
+
+export const hasActiveSubscriberEmailConflict = (
+  subscribers: Subscriber[],
+  candidate: Subscriber,
+  now: Date = new Date()
+): boolean => findActiveSubscriberEmailConflict(subscribers, candidate, now) !== null;

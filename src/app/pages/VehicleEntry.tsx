@@ -18,9 +18,14 @@ import {
 import { VehicleCategory, VehicleEntry as VehicleEntryRecord } from '../types';
 import { translateCategory, validatePlate, getCategoryIcon } from '../data/mockData';
 import { getEffectiveSubscriberStatus } from '../domain/subscribers';
+import {
+  findHistoricalPlateCategoryConflict,
+  formatHistoricalPlateCategoryConflict,
+} from '../domain/plates';
 
 export const VehicleEntry: React.FC = () => {
   const {
+    vehicles,
     currentDetection,
     addVehicleEntry,
     checkDuplicatePlate,
@@ -59,13 +64,21 @@ export const VehicleEntry: React.FC = () => {
     if (checkDuplicatePlate(plate)) {
       return 'Patente ya registrada dentro del estacionamiento';
     }
+    const categoryConflict = findHistoricalPlateCategoryConflict(
+      vehicles,
+      plate,
+      selectedCategory
+    );
+    if (categoryConflict) {
+      return formatHistoricalPlateCategoryConflict(categoryConflict);
+    }
     return null;
   };
 
   const isPlateReady = () => {
     const plate = getActivePlate();
     if (!plate) return false;
-    return validatePlate(plate) && !checkDuplicatePlate(plate);
+    return validateCurrentPlate(plate) === null;
   };
 
   const handleManualPlateChange = (value: string) => {
@@ -112,13 +125,19 @@ export const VehicleEntry: React.FC = () => {
         navigate('/dashboard');
       }, 3000);
     } catch (error) {
-      toast.error('Error al confirmar el ingreso. Por favor intente nuevamente.');
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Error al confirmar el ingreso. Por favor intente nuevamente.';
+      setPlateError(message);
+      toast.error(message);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const activePlate = getActivePlate();
+  const displayedPlateError = activePlate ? validateCurrentPlate(activePlate) : plateError;
   const subscriber = activePlate ? getSubscriberByPlate(activePlate) : null;
   const subscriberStatus = subscriber ? getEffectiveSubscriberStatus(subscriber) : undefined;
   const scopedCategories: { value: VehicleCategory; label: string; icon: string }[] = [
@@ -310,7 +329,7 @@ export const VehicleEntry: React.FC = () => {
                     value={manualPlate}
                     onChange={(e) => handleManualPlateChange(e.target.value)}
                     className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xl tracking-widest uppercase text-center transition-all ${
-                      plateError ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'
+                      displayedPlateError ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'
                     }`}
                     placeholder="ABC123 o AB123CD"
                     maxLength={7}
@@ -323,12 +342,12 @@ export const VehicleEntry: React.FC = () => {
             </div>
 
             {/* Plate Error */}
-            {plateError && (
+            {displayedPlateError && (
               <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-red-800">{plateError}</p>
-                  {plateError.includes('ya registrada') && (
+                  <p className="text-sm font-medium text-red-800">{displayedPlateError}</p>
+                  {displayedPlateError.includes('ya registrada') && (
                     <p className="text-xs text-red-600 mt-1">
                       El vehículo ya se encuentra dentro del estacionamiento. Verifique en Búsqueda o Salidas.
                     </p>
@@ -339,7 +358,7 @@ export const VehicleEntry: React.FC = () => {
           </div>
 
           {/* Subscriber Badge */}
-          {subscriber && !plateError && activePlate && (
+          {subscriber && !displayedPlateError && activePlate && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
               <div className="flex items-center gap-2 text-amber-800">
                 <Star className="w-5 h-5 text-amber-600 fill-amber-400" />
@@ -377,10 +396,10 @@ export const VehicleEntry: React.FC = () => {
                 Número de Patente
               </label>
               <div className={`rounded-xl p-5 text-center transition-all ${
-                activePlate && !plateError ? 'bg-gray-900' : 'bg-gray-100 border-2 border-dashed border-gray-300'
+                activePlate && !displayedPlateError ? 'bg-gray-900' : 'bg-gray-100 border-2 border-dashed border-gray-300'
               }`}>
                 <div className={`text-3xl font-bold font-mono tracking-widest ${
-                  activePlate && !plateError ? 'text-white' : 'text-gray-400'
+                  activePlate && !displayedPlateError ? 'text-white' : 'text-gray-400'
                 }`}>
                   {activePlate || '---'}
                 </div>
@@ -424,7 +443,7 @@ export const VehicleEntry: React.FC = () => {
             <div className={`p-4 rounded-xl border ${
               isPlateReady()
                 ? 'bg-green-50 border-green-200'
-                : plateError
+                : displayedPlateError
                 ? 'bg-red-50 border-red-200'
                 : 'bg-gray-50 border-gray-200'
             }`}>
@@ -434,7 +453,7 @@ export const VehicleEntry: React.FC = () => {
                     <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
                     <span className="text-sm font-medium text-green-800">Listo para confirmar ingreso</span>
                   </>
-                ) : plateError ? (
+                ) : displayedPlateError ? (
                   <>
                     <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
                     <span className="text-sm font-medium text-red-800">Corrija la patente antes de continuar</span>

@@ -31,7 +31,11 @@ import {
   SubscriberPricingRule,
 } from '../data/mockData';
 import { calculateDashboardStats } from '../domain/dashboard';
-import { normalizePlate } from '../domain/plates';
+import {
+  findHistoricalPlateCategoryConflict,
+  formatHistoricalPlateCategoryConflict,
+  normalizePlate,
+} from '../domain/plates';
 import { calculateParkingFee, normalizePricingRule } from '../domain/pricing';
 import {
   calculateDurationMinutes,
@@ -42,9 +46,12 @@ import {
   getSubscriberByPlate as findSubscriberByPlate,
   calculateSubscriberParkingAmount,
   canRenewMonthlySubscriber,
+  findActiveSubscriberEmailConflict,
+  findActiveSubscriberPlateConflict,
   getSubscriberValidity,
   isActiveMonthlySubscriber,
   MONTHLY_SUBSCRIPTION_AMOUNT_ARS,
+  normalizeSubscriberEmail,
   renewMonthlySubscriber,
 } from '../domain/subscribers';
 import {
@@ -299,6 +306,15 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     category: VehicleCategory
   ): Promise<VehicleEntry> => {
     const normalizedPlate = normalizePlate(plate);
+    const categoryConflict = findHistoricalPlateCategoryConflict(
+      vehicles,
+      normalizedPlate,
+      category
+    );
+    if (categoryConflict) {
+      throw new Error(formatHistoricalPlateCategoryConflict(categoryConflict));
+    }
+
     const subscriber = getSubscriberByPlate(normalizedPlate);
     const subscriberValidity = getSubscriberValidity(subscriber);
     const newEntry: VehicleEntry = {
@@ -504,15 +520,13 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
 
   const checkDuplicateSubscriberPlate = (plate: string): Subscriber | undefined => {
     const normalized = normalizePlate(plate);
-    // Find active subscriber with same plate
-    return subscribers.find((sub) => {
-      const subNormalized = normalizePlate(sub.licensePlate);
-      if (subNormalized !== normalized) return false;
-      // Only consider active subscriptions
-      if (sub.type === 'monthly' && sub.expiryDate) {
-        return new Date(sub.expiryDate) > new Date();
-      }
-      return true;
+    return subscribers.find((subscriber) => {
+      if (getSubscriberValidity(subscriber) !== 'active') return false;
+      const plates = [
+        subscriber.licensePlate,
+        ...(subscriber.additionalPlates || []),
+      ];
+      return plates.some((subscriberPlate) => normalizePlate(subscriberPlate) === normalized);
     });
   };
 
@@ -533,16 +547,31 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     }
   ): { subscriber: Subscriber; ticket?: TicketOperation } => {
     const normalizedPlate = normalizePlate(subscriber.licensePlate);
+    const now = new Date();
+    const candidate: Subscriber = {
+      ...subscriber,
+      id: '__new__',
+      createdAt: now.toISOString(),
+      email: normalizeSubscriberEmail(subscriber.email),
+      licensePlate: normalizedPlate,
+      additionalPlates: (subscriber.additionalPlates || []).map(normalizePlate),
+      status: subscriber.status || 'active',
+    };
 
-    // Check for active duplicate subscription
-    const existingSubscriber = checkDuplicateSubscriberPlate(normalizedPlate);
-    if (existingSubscriber) {
+    const plateConflict = findActiveSubscriberPlateConflict(subscribers, candidate, now);
+    if (plateConflict) {
       throw new Error(
-        `Ya existe un abono activo para la patente ${normalizedPlate}. Solo se permite uno por patente.`
+        `Ya existe un abono activo para la patente ${plateConflict.plate} (${plateConflict.subscriber.name}).`
       );
     }
 
-    const now = new Date();
+    const emailConflict = findActiveSubscriberEmailConflict(subscribers, candidate, now);
+    if (emailConflict) {
+      throw new Error(
+        `Ya existe un abono activo para ${emailConflict.subscriber.name} con el email ${emailConflict.email}.`
+      );
+    }
+
     const expiryDate = new Date(now);
     expiryDate.setMonth(expiryDate.getMonth() + 1);
     const amount =
@@ -559,6 +588,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     const newSubscriber: Subscriber = {
       ...subscriber,
       licensePlate: normalizedPlate,
+      email: normalizeSubscriberEmail(subscriber.email),
       additionalPlates: (subscriber.additionalPlates || []).map(normalizePlate),
       category: subscriber.type === 'monthly' ? subscriber.category || 'auto' : subscriber.category,
       id: Date.now().toString(),
@@ -605,6 +635,7 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
     const existing = subscribers.find((item) => item.id === subscriber.id);
     const normalized: Subscriber = {
       ...subscriber,
+      email: normalizeSubscriberEmail(subscriber.email),
       licensePlate: normalizePlate(subscriber.licensePlate),
       additionalPlates: (subscriber.additionalPlates || []).map(normalizePlate),
       category: subscriber.type === 'monthly' ? subscriber.category || existing?.category || 'auto' : subscriber.category,
@@ -617,6 +648,18 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({
           ? existing?.amount || getSubscriberMonthlyPrice(subscriber)
           : subscriber.amount,
     };
+    const plateConflict = findActiveSubscriberPlateConflict(subscribers, normalized);
+    if (plateConflict) {
+      throw new Error(
+        `Ya existe un abono activo para la patente ${plateConflict.plate} (${plateConflict.subscriber.name}).`
+      );
+    }
+    const emailConflict = findActiveSubscriberEmailConflict(subscribers, normalized);
+    if (emailConflict) {
+      throw new Error(
+        `Ya existe un abono activo para ${emailConflict.subscriber.name} con el email ${emailConflict.email}.`
+      );
+    }
     setSubscribers((prev) =>
       prev.map((item) => (item.id === normalized.id ? normalized : item))
     );

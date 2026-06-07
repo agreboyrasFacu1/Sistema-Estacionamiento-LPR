@@ -1,4 +1,5 @@
 import { EXIT_GRACE_MINUTES } from './pricing';
+import { VehicleEntry } from '../types';
 
 export const calculateDurationMinutes = (
   entryTime: string,
@@ -31,3 +32,11 @@ export const formatDuration = (minutes: number): string => {
   if (mins === 0) return `${hours}h`;
   return `${hours}h ${mins}min`;
 };
+
+export const sortVehiclesByLatestEntry = (
+  vehicles: VehicleEntry[]
+): VehicleEntry[] =>
+  [...vehicles].sort(
+    (first, second) =>
+      new Date(second.entryTime).getTime() - new Date(first.entryTime).getTime()
+  );

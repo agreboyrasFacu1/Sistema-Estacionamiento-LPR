@@ -26,7 +26,7 @@ import {
   getSubscriberValidity,
   isActiveMonthlySubscriber as hasActiveMonthlySubscription,
 } from '../domain/subscribers';
-import { calculateDurationMinutes } from '../domain/stays';
+import { calculateDurationMinutes, sortVehiclesByLatestEntry } from '../domain/stays';
 import { formatCurrencyARSWithCents } from '../utils/currency';
 
 export const VehicleExit: React.FC = () => {
@@ -49,7 +49,6 @@ export const VehicleExit: React.FC = () => {
 
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleEntry | null>(null);
   const [manualPlate, setManualPlate] = useState('');
-  const [isManualSearch, setIsManualSearch] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showTicket, setShowTicket] = useState(false);
   const [exitResult, setExitResult] = useState<VehicleEntry | null>(null);
@@ -74,7 +73,7 @@ export const VehicleExit: React.FC = () => {
   }, [routeDetectedPlate]);
 
   useEffect(() => {
-    if (currentDetection && !isManualSearch) {
+    if (currentDetection) {
       const vehicle = searchVehicle(currentDetection.plate);
       if (vehicle) {
         setSelectedVehicle(vehicle);
@@ -245,7 +244,9 @@ export const VehicleExit: React.FC = () => {
   const subscriberValidity = sub ? getSubscriberValidity(sub) : undefined;
   const monthlyFree = isActiveMonthlySubscriber();
 
-  const activeVehicles = vehicles.filter((v) => !v.exitTime);
+  const activeVehicles = sortVehiclesByLatestEntry(
+    vehicles.filter((v) => !v.exitTime)
+  );
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -298,7 +299,7 @@ export const VehicleExit: React.FC = () => {
             </div>
 
             {/* Auto Detection */}
-            {!isManualSearch && currentDetection && (
+            {currentDetection && (
               <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="text-xs font-medium text-blue-700 mb-1">Placa Auto-Detectada</div>
                 <div className="text-xl font-bold text-gray-900 font-mono">
@@ -311,35 +312,21 @@ export const VehicleExit: React.FC = () => {
             )}
 
             {/* Manual Search */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isManualSearch}
-                  onChange={(e) => setIsManualSearch(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                />
-                <label className="text-sm font-medium text-gray-700">Búsqueda Manual</label>
-              </div>
-
-              {isManualSearch && (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={manualPlate}
-                    onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
-                    onKeyPress={(e) => e.key === 'Enter' && handleManualSearch()}
-                    className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono uppercase text-sm"
-                    placeholder="ABC123"
-                  />
-                  <button
-                    onClick={handleManualSearch}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors"
-                  >
-                    <Search className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualPlate}
+                onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
+                onKeyPress={(e) => e.key === 'Enter' && handleManualSearch()}
+                className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono uppercase text-sm"
+                placeholder="BUSCAR POR PATENTE..."
+              />
+              <button
+                onClick={handleManualSearch}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors"
+              >
+                <Search className="w-4 h-4" />
+              </button>
             </div>
 
             {searchError && (
