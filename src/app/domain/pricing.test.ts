@@ -65,16 +65,25 @@ describe('calculateParkingFee', () => {
 
   it('uses the canonical ARS amounts for auto and camioneta', () => {
     expect(calculateParkingFee('auto', 60, arsRules)).toBe(5000);
+    expect(calculateParkingFee('auto', 61, arsRules)).toBe(5750);
+    expect(calculateParkingFee('auto', 70, arsRules)).toBe(5750);
+    expect(calculateParkingFee('auto', 71, arsRules)).toBe(6500);
     expect(calculateParkingFee('auto', 120, arsRules)).toBe(9500);
     expect(calculateParkingFee('auto', 150, arsRules)).toBe(11750);
 
     expect(calculateParkingFee('camioneta', 60, arsRules)).toBe(5000);
+    expect(calculateParkingFee('camioneta', 61, arsRules)).toBe(5750);
+    expect(calculateParkingFee('camioneta', 70, arsRules)).toBe(5750);
+    expect(calculateParkingFee('camioneta', 71, arsRules)).toBe(6500);
     expect(calculateParkingFee('camioneta', 120, arsRules)).toBe(9500);
     expect(calculateParkingFee('camioneta', 150, arsRules)).toBe(11750);
   });
 
   it('uses the canonical ARS amounts for moto', () => {
     expect(calculateParkingFee('moto', 60, arsRules)).toBe(3000);
+    expect(calculateParkingFee('moto', 61, arsRules)).toBe(3450);
+    expect(calculateParkingFee('moto', 70, arsRules)).toBe(3450);
+    expect(calculateParkingFee('moto', 71, arsRules)).toBe(3900);
     expect(calculateParkingFee('moto', 120, arsRules)).toBe(5700);
     expect(calculateParkingFee('moto', 150, arsRules)).toBe(7050);
   });

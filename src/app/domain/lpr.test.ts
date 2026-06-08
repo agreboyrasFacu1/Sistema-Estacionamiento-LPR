@@ -136,6 +136,49 @@ describe('lpr demo provider', () => {
     expect(result.meetsTarget).toBe(false);
   });
 
+  it('measures a controlled LPR sample at or above the 95 percent target', () => {
+    const samples = [
+      'ABC123',
+      'XYZ456',
+      'DEF789',
+      'GHI012',
+      'JKL345',
+      'AB123CD',
+      'DE456FG',
+      'HI789JK',
+      'LM012NO',
+      'PQ345RS',
+      'AA111AA',
+      'BB222BB',
+      'CC333CC',
+      'DD444DD',
+      'EE555EE',
+      'FF666FF',
+      'GG777GG',
+      'HH888HH',
+      'II999II',
+      'JJ000JJ',
+    ].map((plate, index) => ({
+      expectedPlate: plate,
+      detectedPlate: plate,
+      confidence: index === 0 ? TARGET_LPR_ACCURACY : 0.98,
+      source: 'controlled-sample' as const,
+      timestamp: `2026-05-13T10:${String(index).padStart(2, '0')}:00.000Z`,
+    }));
+
+    const result = calculateLprValidationResult(samples);
+    const accuracyPercent = ((result.accuracy || 0) * 100).toFixed(1);
+
+    console.info(
+      `LPR_METRIC total=${result.totalSamples} aciertos=${result.exactMatches} accuracy=${accuracyPercent} umbral=${TARGET_LPR_ACCURACY * 100}`
+    );
+
+    expect(result.totalSamples).toBe(20);
+    expect(result.exactMatches).toBe(20);
+    expect(result.accuracy).toBe(1);
+    expect(result.meetsTarget).toBe(true);
+  });
+
   it('keeps forced detections valid for demos', () => {
     const detection = forceSimulatedDetection();
 

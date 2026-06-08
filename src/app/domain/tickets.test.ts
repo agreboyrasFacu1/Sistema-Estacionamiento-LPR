@@ -62,6 +62,22 @@ describe('tickets domain', () => {
     });
   });
 
+  it('records all operational payment methods in parking stay tickets', () => {
+    for (const method of ['cash', 'card', 'subscriber', 'no_charge'] as const) {
+      const ticket = createTicketOperation(
+        { ...paidVehicle, paymentMethod: method },
+        method,
+        'cashier-1',
+        new Date('2026-05-13T10:16:00.000Z')
+      );
+
+      expect(ticket.operationType).toBe('parking_stay');
+      expect(ticket.ticketNumber).toMatch(/^TKT-/);
+      expect(ticket.paymentMethod).toBe(method);
+      expect(ticket.isFiscal).toBe(false);
+    }
+  });
+
   it('creates deterministic subscription renewal ticket numbers', () => {
     expect(
       createSubscriptionRenewalTicketNumber(
