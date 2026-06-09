@@ -23,12 +23,13 @@ const SIMULATED_PLATES = [
 ];
 
 export const TARGET_LPR_ACCURACY = 0.95;
+export const LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD = 0.70;
 
 export const isLprDetectionAccepted = (
   plate: string,
   confidence: number,
-  targetAccuracy: number = TARGET_LPR_ACCURACY
-): boolean => validatePlate(plate) && confidence >= targetAccuracy;
+  threshold: number = LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD
+): boolean => validatePlate(plate) && confidence >= threshold;
 
 export type LprQualityStatus =
   | 'no_sample'

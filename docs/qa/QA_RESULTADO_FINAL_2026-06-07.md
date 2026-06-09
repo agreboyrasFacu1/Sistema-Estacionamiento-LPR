@@ -47,6 +47,8 @@ La profesora pidio ver evidencias de medicion de todos los indicadores. Este doc
 
 La metrica LPR se valida sobre dataset controlado y fixtures deterministicos incluidos en el repositorio. No representa una medicion de camara real en produccion si no hay imagenes/OCR real versionados en el repo. Si valida que el calculo automatizado de accuracy y el umbral minimo del 95% funcionan correctamente.
 
+Nota post-QA: luego de la ejecución QA final se separó el objetivo de calidad LPR del umbral operativo demo. El objetivo de calidad documentado se mantiene en 95%; el umbral operativo interno de demo se configuró en 70% para facilitar la transcripción durante pruebas locales. Esto no modifica la evidencia histórica de QA ni representa una medición real de cámara productiva.
+
 ## Conclusion
 
 La ejecucion final valida 14/14 indicadores medibles, con 0 indicadores parciales, 0 pendientes y 0 fallidos.

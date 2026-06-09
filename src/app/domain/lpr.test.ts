@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TARGET_LPR_ACCURACY,
+  LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD,
   calculateLprValidationResult,
   calculateLprAccuracy,
   extractPlateCandidateFromText,
@@ -93,9 +94,10 @@ describe('lpr demo provider', () => {
     expect(getLprQualityStatus(0.95, 100)).toBe('target_met');
   });
 
-  it('accepts automatic LPR detections only at 95% confidence or higher', () => {
-    expect(isLprDetectionAccepted('AG759LH', 0.94)).toBe(false);
-    expect(isLprDetectionAccepted('AG759LH', 0.95)).toBe(true);
+  it('accepts automatic LPR detections using the operational threshold (70%)', () => {
+    expect(isLprDetectionAccepted('AG759LH', 0.69)).toBe(false);
+    expect(isLprDetectionAccepted('AG759LH', 0.70)).toBe(true);
+    expect(isLprDetectionAccepted('AG759LH', 0.94)).toBe(true);
     expect(isLprDetectionAccepted('12345', 0.99)).toBe(false);
   });
 
@@ -217,7 +219,7 @@ describe('lpr demo provider', () => {
     });
 
     expect(result).toEqual({ plate: 'AG759LH', confidence: 0.87 });
-    expect(isLprDetectionAccepted(result?.plate || '', result?.confidence || 0)).toBe(false);
+    expect(isLprDetectionAccepted(result?.plate || '', result?.confidence || 0)).toBe(true);
   });
 
   it('returns null when Plate Recognizer has no supported Argentine plate format', () => {

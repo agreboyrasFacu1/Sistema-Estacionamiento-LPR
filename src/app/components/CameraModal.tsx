@@ -14,7 +14,7 @@ import {
   Hand,
 } from 'lucide-react';
 import { useParking } from '../contexts/ParkingContext';
-import { TARGET_LPR_ACCURACY, webcamDemoLprProvider } from '../domain/lpr';
+import { TARGET_LPR_ACCURACY, LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD, webcamDemoLprProvider } from '../domain/lpr';
 import type { LprFrame } from '../domain/lpr';
 import { normalizePlate, validatePlate } from '../domain/plates';
 import { LPRDetection } from '../types';
@@ -263,7 +263,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         }
         setCameraState('detected');
         setErrorMessage(
-          `La lectura no alcanzo el minimo de ${Math.round(TARGET_LPR_ACCURACY * 100)}% de confianza. Intente nuevamente o ingrese la patente manualmente.`
+          `La lectura no alcanzo la confianza minima para esta demo. Intenta nuevamente con mejor iluminacion o ingresa la patente manualmente. Objetivo de calidad LPR: ${Math.round(TARGET_LPR_ACCURACY * 100)}%.`
         );
         return;
       }
@@ -314,9 +314,9 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
     const detectedPlate = detection?.plate || plate;
     const confidence = detection?.confidence ?? 1;
-    if (detection && confidence < TARGET_LPR_ACCURACY) {
+    if (detection && confidence < LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD) {
       setErrorMessage(
-        `La lectura no alcanzo el minimo de ${Math.round(TARGET_LPR_ACCURACY * 100)}% de confianza. Ingrese la patente manualmente para continuar.`
+        `La lectura no alcanzo la confianza minima para esta demo. Ingresa la patente manualmente para continuar. Objetivo de calidad LPR: ${Math.round(TARGET_LPR_ACCURACY * 100)}%.`
       );
       return;
     }
