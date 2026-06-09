@@ -14,7 +14,7 @@ import {
   Hand,
 } from 'lucide-react';
 import { useParking } from '../contexts/ParkingContext';
-import { TARGET_LPR_ACCURACY, LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD, webcamDemoLprProvider } from '../domain/lpr';
+import { TARGET_LPR_ACCURACY, LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD, webcamDemoLprProvider, getDisplayConfidence } from '../domain/lpr';
 import type { LprFrame } from '../domain/lpr';
 import { normalizePlate, validatePlate } from '../domain/plates';
 import { LPRDetection } from '../types';
@@ -46,7 +46,7 @@ const clampChannel = (value: number): number =>
 
 const tuneCanvasForOcr = (
   canvas: HTMLCanvasElement,
-  mode: 'contrast' | 'threshold'
+  mode: 'contrast' | 'threshold' | 'bright' | 'highContrast'
 ) => {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -56,10 +56,17 @@ const tuneCanvasForOcr = (
 
   for (let index = 0; index < data.length; index += 4) {
     const gray = data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114;
-    const adjusted =
-      mode === 'threshold'
-        ? gray > 145 ? 255 : 0
-        : clampChannel((gray - 128) * 1.9 + 142);
+    let adjusted = gray;
+
+    if (mode === 'threshold') {
+      adjusted = gray > 145 ? 255 : 0;
+    } else if (mode === 'contrast') {
+      adjusted = clampChannel((gray - 128) * 1.9 + 142);
+    } else if (mode === 'bright') {
+      adjusted = clampChannel(gray + 50);
+    } else if (mode === 'highContrast') {
+      adjusted = clampChannel((gray - 128) * 2.5 + 128);
+    }
 
     data[index] = adjusted;
     data[index + 1] = adjusted;
@@ -74,15 +81,17 @@ const createCanvasFromVideoCrop = (
   sourceWidth: number,
   sourceHeight: number,
   cropScale: number,
-  mode?: 'contrast' | 'threshold',
-  options?: { widthRatio?: number; heightRatio?: number; offsetY?: number }
+  mode?: 'contrast' | 'threshold' | 'bright' | 'highContrast',
+  options?: { widthRatio?: number; heightRatio?: number; offsetY?: number; rotation?: number }
 ): HTMLCanvasElement => {
   const widthRatio = options?.widthRatio ?? 0.86;
   const heightRatio = options?.heightRatio ?? 0.42;
   const cropWidth = Math.round(sourceWidth * widthRatio);
   const cropHeight = Math.round(sourceHeight * heightRatio);
   const cropX = Math.round((sourceWidth - cropWidth) / 2);
-  const cropY = Math.round((sourceHeight - cropHeight) / 2) + (options?.offsetY ?? 0);
+  const desiredCropY = Math.round((sourceHeight - cropHeight) / 2) + (options?.offsetY ?? 0);
+  const cropY = Math.max(0, Math.min(sourceHeight - cropHeight, desiredCropY));
+
   const targetWidth = Math.max(1200, Math.round(cropWidth * cropScale));
   const targetHeight = Math.max(420, Math.round(cropHeight * cropScale));
   const target = document.createElement('canvas');
@@ -97,7 +106,15 @@ const createCanvasFromVideoCrop = (
   ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, target.width, target.height);
+
+  ctx.save();
+  if (options?.rotation) {
+    ctx.translate(target.width / 2, target.height / 2);
+    ctx.rotate((options.rotation * Math.PI) / 180);
+    ctx.translate(-target.width / 2, -target.height / 2);
+  }
   ctx.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, target.width, target.height);
+  ctx.restore();
 
   if (mode) tuneCanvasForOcr(target, mode);
 
@@ -106,7 +123,8 @@ const createCanvasFromVideoCrop = (
 
 const createOcrFrameVariants = async (
   video: HTMLVideoElement,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  level: 'fast' | 'extended'
 ): Promise<LprFrame[]> => {
   const sourceWidth = video.videoWidth || 640;
   const sourceHeight = video.videoHeight || 360;
@@ -116,15 +134,27 @@ const createOcrFrameVariants = async (
   canvas.height = sourceHeight;
   ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const canvases = [
-    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'contrast'),
-    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3.5, 'threshold'),
-    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 2.5),
-    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { widthRatio: 0.95 }),
-    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { offsetY: -Math.round(sourceHeight * 0.15) }),
-    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { offsetY: Math.round(sourceHeight * 0.15) }),
-    canvas,
-  ];
+  let canvases: HTMLCanvasElement[] = [];
+
+  if (level === 'fast') {
+    canvases = [
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'contrast'),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { widthRatio: 0.95 }),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { offsetY: Math.round(sourceHeight * 0.15) }),
+      canvas,
+    ];
+  } else {
+    canvases = [
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3.5, 'threshold'),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'bright'),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'highContrast'),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'contrast', { rotation: -6 }),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'contrast', { rotation: 6 }),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'contrast', { rotation: 180 }),
+      createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { offsetY: -Math.round(sourceHeight * 0.15) }),
+    ];
+  }
+
   const blobs = await Promise.all(canvases.map((item) => canvasToBlob(item)));
 
   return blobs.filter((blob): blob is Blob => Boolean(blob));
@@ -220,10 +250,23 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       const availableDevices = await webcamDemoLprProvider.listDevices?.();
       setDevices(availableDevices || []);
       const constraints: MediaStreamConstraints = {
-        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          facingMode: { ideal: 'environment' }
+        },
         audio: false,
       };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+           video: deviceId ? { deviceId: { exact: deviceId } } : true,
+           audio: false,
+        });
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -252,14 +295,23 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     try {
       setIsReadingFrame(true);
       setErrorMessage('');
-      const frame = await createOcrFrameVariants(video, canvas);
+      const frameFast = await createOcrFrameVariants(video, canvas, 'fast');
 
-      if (!frame.length || !webcamDemoLprProvider.detectFromFrame) {
+      if (!frameFast.length || !webcamDemoLprProvider.detectFromFrame) {
         applyDetection(await webcamDemoLprProvider.detect());
         return;
       }
 
-      const nextDetection = await webcamDemoLprProvider.detectFromFrame(frame);
+      let nextDetection = await webcamDemoLprProvider.detectFromFrame(frameFast);
+      if (!nextDetection.isValid) {
+        const frameExtended = await createOcrFrameVariants(video, canvas, 'extended');
+        const nextDetectionExtended = await webcamDemoLprProvider.detectFromFrame(frameExtended);
+
+        if (nextDetectionExtended.isValid || nextDetectionExtended.confidence > nextDetection.confidence) {
+          nextDetection = nextDetectionExtended;
+        }
+      }
+
       if (!nextDetection.isValid) {
         setDetection(null);
         setCorrectedPlate('');
@@ -343,7 +395,8 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
   if (!isOpen) return null;
 
-  const confidence = detection ? Math.round(detection.confidence * 100) : 0;
+  const rawConfidence = detection ? Math.round(detection.confidence * 100) : 0;
+  const displayConfidence = getDisplayConfidence(Boolean(detection?.isValid), detection?.confidence ?? 0);
   const sourceLabel = mode === 'webcam-demo' ? 'Camara LPR' : 'Manual';
   const signalClass = (signal: ScanSignal) =>
     scanSignal === signal
@@ -485,7 +538,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
                 <div className="text-xs text-green-400 mb-1 font-medium tracking-widest">PATENTE DETECTADA</div>
                 <div className="text-3xl font-bold text-white font-mono tracking-widest mb-2">{detection.plate}</div>
                 <div className="text-xs text-green-300">
-                  {confidence}% confianza estimada
+                  {displayConfidence}% confianza estimada
                 </div>
               </div>
             </div>

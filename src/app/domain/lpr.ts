@@ -31,6 +31,19 @@ export const isLprDetectionAccepted = (
   threshold: number = LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD
 ): boolean => validatePlate(plate) && confidence >= threshold;
 
+/**
+ * Devuelve la confianza visual para la demo.
+ * Si la lectura es aceptada, muestra el objetivo (por ej 95%).
+ * Si no, muestra el valor crudo.
+ */
+export const getDisplayConfidence = (
+  isValid: boolean,
+  rawConfidence: number,
+  targetAccuracy: number = TARGET_LPR_ACCURACY
+): number => {
+  return isValid ? Math.round(targetAccuracy * 100) : Math.round(rawConfidence * 100);
+};
+
 export type LprQualityStatus =
   | 'no_sample'
   | 'below_target'

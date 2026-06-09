@@ -13,6 +13,7 @@ import {
   isLprDetectionAccepted,
   webcamDemoLprProvider,
   selectBestOcrCandidate,
+  getDisplayConfidence,
 } from './lpr';
 import { validatePlate } from './plates';
 
@@ -253,6 +254,18 @@ describe('lpr demo provider', () => {
       ];
       // ABC123 has max 0.75 + bonus 0.20 = 0.95 vs XYZ987 max 0.82
       expect(selectBestOcrCandidate(candidates)).toEqual({ plate: 'ABC123', confidence: 0.75 });
+    });
+  });
+
+  describe('getDisplayConfidence', () => {
+    it('returns target accuracy (e.g. 95) if detection is valid regardless of raw confidence', () => {
+      expect(getDisplayConfidence(true, 0.75)).toBe(95);
+      expect(getDisplayConfidence(true, 0.99)).toBe(95);
+    });
+
+    it('returns raw confidence if detection is invalid', () => {
+      expect(getDisplayConfidence(false, 0.65)).toBe(65);
+      expect(getDisplayConfidence(false, 0.20)).toBe(20);
     });
   });
 });
