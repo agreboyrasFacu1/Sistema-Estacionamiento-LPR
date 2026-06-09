@@ -12,6 +12,7 @@ import {
   getLprQualityStatus,
   isLprDetectionAccepted,
   webcamDemoLprProvider,
+  selectBestOcrCandidate,
 } from './lpr';
 import { validatePlate } from './plates';
 
@@ -228,5 +229,30 @@ describe('lpr demo provider', () => {
         results: [{ plate: '12345', score: 0.93 }],
       })
     ).toBeNull();
+  });
+
+  describe('selectBestOcrCandidate', () => {
+    it('returns null when no candidates are provided', () => {
+      expect(selectBestOcrCandidate([])).toBeNull();
+    });
+
+    it('returns the candidate with the highest confidence when there are no repetitions', () => {
+      const candidates = [
+        { plate: 'ABC123', confidence: 0.60 },
+        { plate: 'XYZ987', confidence: 0.82 },
+        { plate: 'AAA111', confidence: 0.70 },
+      ];
+      expect(selectBestOcrCandidate(candidates)).toEqual({ plate: 'XYZ987', confidence: 0.82 });
+    });
+
+    it('prioritizes a repeated plate over a non-repeated plate with slightly higher confidence', () => {
+      const candidates = [
+        { plate: 'ABC123', confidence: 0.75 },
+        { plate: 'XYZ987', confidence: 0.82 }, // Isolated higher confidence
+        { plate: 'ABC123', confidence: 0.72 }, // Repeated
+      ];
+      // ABC123 has max 0.75 + bonus 0.20 = 0.95 vs XYZ987 max 0.82
+      expect(selectBestOcrCandidate(candidates)).toEqual({ plate: 'ABC123', confidence: 0.75 });
+    });
   });
 });

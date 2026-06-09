@@ -246,7 +246,7 @@ const imageDataToBlob = async (imageData: ImageData): Promise<Blob | null> => {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
 };
 
-const frameToUploadBlob = async (frame: LprFrame): Promise<Blob | null> => {
+const frameToBlob = async (frame: LprFrame): Promise<Blob | null> => {
   if (frame instanceof Blob) return frame;
   return imageDataToBlob(frame);
 };
@@ -264,7 +264,7 @@ const readPlateWithPlateRecognizer = async (
   frame: LprFrame
 ): Promise<{ plate: string; confidence: number }> => {
   const token = getPlateRecognizerToken();
-  const blob = await frameToUploadBlob(frame);
+  const blob = await frameToBlob(frame);
 
   if (!token || !blob) {
     throw new Error('Plate Recognizer no configurado');
@@ -352,26 +352,73 @@ const getOcrWorker = async (): Promise<OcrWorker> => {
   return ocrWorkerPromise;
 };
 
-const runOcrOnFrames = async (frames: LprFrame | LprFrame[]): Promise<{
+export interface OcrCandidate {
   plate: string;
   confidence: number;
-}> => {
-  const worker = await getOcrWorker();
-  const frameList = Array.isArray(frames) ? frames : [frames];
+}
 
-  for (const frame of frameList) {
-    const result = await worker.recognize(frame);
-    const plate = extractPlateCandidateFromText(result.data.text);
+export const selectBestOcrCandidate = (candidates: OcrCandidate[]): OcrCandidate | null => {
+  if (candidates.length === 0) {
+    return null;
+  }
 
-    if (plate) {
-      return {
-        plate,
-        confidence: Math.max(0, Math.min(1, result.data.confidence / 100)),
-      };
+  const plateScores = new Map<string, { maxConfidence: number; count: number }>();
+  for (const c of candidates) {
+    const existing = plateScores.get(c.plate);
+    if (existing) {
+      existing.count += 1;
+      existing.maxConfidence = Math.max(existing.maxConfidence, c.confidence);
+    } else {
+      plateScores.set(c.plate, { maxConfidence: c.confidence, count: 1 });
     }
   }
 
-  throw new Error('No se encontro una patente valida en la imagen');
+  let bestPlate = '';
+  let bestScore = -1;
+  let rawConfidenceForBestPlate = 0;
+
+  for (const [plate, stats] of plateScores.entries()) {
+    const score = stats.maxConfidence + (stats.count > 1 ? 0.2 : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestPlate = plate;
+      rawConfidenceForBestPlate = stats.maxConfidence;
+    }
+  }
+
+  return {
+    plate: bestPlate,
+    confidence: rawConfidenceForBestPlate,
+  };
+};
+
+const runOcrOnFrames = async (frames: LprFrame | LprFrame[]): Promise<OcrCandidate> => {
+  const worker = await getOcrWorker();
+  const frameList = Array.isArray(frames) ? frames : [frames];
+
+  const candidates: OcrCandidate[] = [];
+
+  for (const frame of frameList) {
+    const ocrInput = await frameToBlob(frame);
+    if (!ocrInput) continue;
+
+    const result = await worker.recognize(ocrInput);
+    const plate = extractPlateCandidateFromText(result.data.text);
+
+    if (plate) {
+      candidates.push({
+        plate,
+        confidence: Math.max(0, Math.min(1, result.data.confidence / 100)),
+      });
+    }
+  }
+
+  const best = selectBestOcrCandidate(candidates);
+  if (!best) {
+    throw new Error('No se encontro una patente valida en la imagen');
+  }
+
+  return best;
 };
 
 export const simulatedLprProvider: LprProvider = {

@@ -74,12 +74,15 @@ const createCanvasFromVideoCrop = (
   sourceWidth: number,
   sourceHeight: number,
   cropScale: number,
-  mode?: 'contrast' | 'threshold'
+  mode?: 'contrast' | 'threshold',
+  options?: { widthRatio?: number; heightRatio?: number; offsetY?: number }
 ): HTMLCanvasElement => {
-  const cropWidth = Math.round(sourceWidth * 0.86);
-  const cropHeight = Math.round(sourceHeight * 0.42);
+  const widthRatio = options?.widthRatio ?? 0.86;
+  const heightRatio = options?.heightRatio ?? 0.42;
+  const cropWidth = Math.round(sourceWidth * widthRatio);
+  const cropHeight = Math.round(sourceHeight * heightRatio);
   const cropX = Math.round((sourceWidth - cropWidth) / 2);
-  const cropY = Math.round((sourceHeight - cropHeight) / 2);
+  const cropY = Math.round((sourceHeight - cropHeight) / 2) + (options?.offsetY ?? 0);
   const targetWidth = Math.max(1200, Math.round(cropWidth * cropScale));
   const targetHeight = Math.max(420, Math.round(cropHeight * cropScale));
   const target = document.createElement('canvas');
@@ -117,6 +120,9 @@ const createOcrFrameVariants = async (
     createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, 'contrast'),
     createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3.5, 'threshold'),
     createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 2.5),
+    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { widthRatio: 0.95 }),
+    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { offsetY: -Math.round(sourceHeight * 0.15) }),
+    createCanvasFromVideoCrop(video, sourceWidth, sourceHeight, 3, undefined, { offsetY: Math.round(sourceHeight * 0.15) }),
     canvas,
   ];
   const blobs = await Promise.all(canvases.map((item) => canvasToBlob(item)));
@@ -177,6 +183,10 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       stableDetectionRef.current.count += 1;
     } else {
       stableDetectionRef.current = { plate, count: 1 };
+    }
+
+    if (nextDetection.confidence >= 0.85) {
+      return true;
     }
 
     return stableDetectionRef.current.count >= 2;
