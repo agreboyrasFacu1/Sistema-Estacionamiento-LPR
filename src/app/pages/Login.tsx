@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, AlertCircle, Loader2, Car } from 'lucide-react';
+import { LogIn, AlertCircle, Loader2 } from 'lucide-react';
+import parkingGemLogo from '../assets/parkinggem.svg';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -36,8 +37,12 @@ export const Login: React.FC = () => {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-18 h-18 mb-4">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-              <Car className="w-9 h-9 text-white" />
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 overflow-hidden">
+              <img
+                src={parkingGemLogo}
+                alt="ParkingGem"
+                className="w-12 h-12 object-contain"
+              />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-1">
