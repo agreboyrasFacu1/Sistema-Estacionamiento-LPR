@@ -236,30 +236,76 @@ function Resolve-Runtime {
   return "Node"
 }
 
-function Start-NodeRuntime {
-  Ensure-NodeRuntime
+function Test-NodeDependencyInstalled {
+  param([string]$PackageName)
+  $packagePath = Join-Path "node_modules" $PackageName
+  if (-not (Test-Path $packagePath)) {
+    return $false
+  }
+  return $true
+}
 
+function Install-DependenciesIfNeeded {
   if ($UseCleanInstall -and $NoInstall) {
     Fail "No use -UseCleanInstall junto con -NoInstall."
   }
 
+  $needsInstall = $false
+  $installCmd = "install"
+  $installReason = ""
+
   if ($UseCleanInstall) {
-    Write-Info "Ejecutando npm.cmd ci por pedido de -UseCleanInstall."
-    if (-not $CheckOnly) {
-      Invoke-CheckedCommand "npm.cmd" @("ci")
-    }
+    $needsInstall = $true
+    $installCmd = "ci"
+    $installReason = "pedido de -UseCleanInstall"
   } elseif (-not (Test-Path "node_modules")) {
+    $needsInstall = $true
+    $installCmd = "ci"
+    $installReason = "node_modules no existe"
+  } else {
+    # Check if package.json or package-lock.json are newer than node_modules
+    $nodeModulesTime = (Get-Item "node_modules").LastWriteTime
+    $packageJsonTime = (Get-Item "package.json").LastWriteTime
+    $lockExists = Test-Path "package-lock.json"
+    $lockTime = if ($lockExists) { (Get-Item "package-lock.json").LastWriteTime } else { [DateTime]::MinValue }
+
+    if ($packageJsonTime -gt $nodeModulesTime -or $lockTime -gt $nodeModulesTime) {
+      $needsInstall = $true
+      $installCmd = "install"
+      $installReason = "package.json o package-lock.json es mas nuevo que node_modules"
+    } elseif (-not (Test-NodeDependencyInstalled "tesseract.js")) {
+      $needsInstall = $true
+      $installCmd = "install"
+      $installReason = "falta la dependencia critica tesseract.js"
+    }
+  }
+
+  if ($needsInstall) {
     if ($NoInstall) {
-      Fail "No existe node_modules y se indico -NoInstall. Ejecute sin -NoInstall o corra npm.cmd ci."
+      Fail "Dependencias incompletas ($installReason) y se indico -NoInstall. Ejecute sin -NoInstall."
     }
 
-    Write-Info "No existe node_modules. Instalando dependencias con npm.cmd ci."
+    if ($installCmd -eq "ci" -and -not (Test-Path "package-lock.json")) {
+      $installCmd = "install"
+    }
+
+    Write-Info "Se requiere instalacion: $installReason. Ejecutando npm.cmd $installCmd."
     if (-not $CheckOnly) {
-      Invoke-CheckedCommand "npm.cmd" @("ci")
+      Invoke-CheckedCommand "npm.cmd" @($installCmd)
+
+      if (Test-Path "node_modules") {
+        (Get-Item "node_modules").LastWriteTime = Get-Date
+      }
     }
   } else {
-    Write-Info "node_modules existe. No se reinstalan dependencias."
+    Write-Info "node_modules existe y parece completo. No se reinstalan dependencias."
   }
+}
+
+function Start-NodeRuntime {
+  Ensure-NodeRuntime
+
+  Install-DependenciesIfNeeded
 
   $url = "http://${HostAddress}:${Port}/"
   Write-Info "Runtime Node listo."
