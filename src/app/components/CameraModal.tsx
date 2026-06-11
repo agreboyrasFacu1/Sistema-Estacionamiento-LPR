@@ -19,6 +19,7 @@ import {
   TARGET_LPR_ACCURACY,
   LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD,
   webcamDemoLprProvider,
+  getDemoAllowedPlates,
   getDisplayConfidence,
   selectStableLprDetection,
 } from '../domain/lpr';
@@ -219,7 +220,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       nextDetection,
     ].slice(-LPR_TEMPORAL_BUFFER_SIZE);
 
-    return selectStableLprDetection(recentDetectionsRef.current);
+    return selectStableLprDetection(recentDetectionsRef.current, 2, getDemoAllowedPlates());
   };
 
   const scheduleAutomaticScan = (delay = 1200) => {
@@ -533,7 +534,11 @@ export const CameraModal: React.FC<CameraModalProps> = ({
                 </div>
               </div>
               <div className="rounded-full bg-black/70 px-4 py-1.5 text-xs font-medium tracking-wider text-blue-200">
-                {isReadingFrame ? `LEYENDO PATENTE${'.'.repeat(dots)}` : `LECTURA AUTOMATICA ACTIVA${'.'.repeat(dots)}`}
+                {isReadingFrame
+                  ? `LEYENDO PATENTE${'.'.repeat(dots)}`
+                  : scanSignal === 'steady'
+                    ? `BUSCANDO LECTURA ESTABLE${'.'.repeat(dots)}`
+                    : `ACERQUE LA PATENTE AL RECUADRO${'.'.repeat(dots)}`}
               </div>
             </div>
           )}
