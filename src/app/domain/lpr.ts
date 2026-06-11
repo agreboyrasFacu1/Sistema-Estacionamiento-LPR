@@ -224,6 +224,65 @@ export const extractPlateCandidateFromText = (text: string): string | null => {
   return null;
 };
 
+const getPlateFormat = (plate: string): 'legacy' | 'mercosur' | null => {
+  if (/^[A-Z]{3}\d{3}$/.test(plate)) return 'legacy';
+  if (/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(plate)) return 'mercosur';
+  return null;
+};
+
+const getSameLengthDistance = (left: string, right: string): number => {
+  if (left.length !== right.length) return Number.POSITIVE_INFINITY;
+
+  return left
+    .split('')
+    .reduce((distance, char, index) => distance + (char === right[index] ? 0 : 1), 0);
+};
+
+export const parseDemoAllowedPlates = (value?: string): string[] => {
+  if (!value) return [];
+
+  const allowedPlates = new Set<string>();
+  value
+    .split(',')
+    .map((plate) => normalizePlate(plate))
+    .filter(validatePlate)
+    .forEach((plate) => allowedPlates.add(plate));
+
+  return [...allowedPlates];
+};
+
+export const getDemoAllowedPlates = (): string[] =>
+  parseDemoAllowedPlates(getClientEnvValue('VITE_LPR_DEMO_ALLOWED_PLATES'));
+
+export const resolveDemoPlateByWhitelist = (
+  detectedPlate: string,
+  allowedPlates: string[]
+): string | null => {
+  const detected = normalizePlate(detectedPlate);
+  const detectedFormat = getPlateFormat(detected);
+  if (!detectedFormat || !validatePlate(detected)) return null;
+
+  const allowed = parseDemoAllowedPlates(allowedPlates.join(','));
+  if (allowed.length === 0) return null;
+  if (allowed.includes(detected)) return detected;
+
+  const maxDistance = detectedFormat === 'mercosur' ? 2 : 1;
+  const candidates = allowed
+    .map((plate) => ({
+      plate,
+      distance: getPlateFormat(plate) === detectedFormat
+        ? getSameLengthDistance(detected, plate)
+        : Number.POSITIVE_INFINITY,
+    }))
+    .filter((candidate) => candidate.distance <= maxDistance)
+    .sort((left, right) => left.distance - right.distance);
+
+  if (candidates.length === 0) return null;
+  if (candidates.length > 1 && candidates[0].distance === candidates[1].distance) return null;
+
+  return validatePlate(candidates[0].plate) ? candidates[0].plate : null;
+};
+
 export const extractPlateFromPlateRecognizerResponse = (
   response: PlateRecognizerResponse
 ): { plate: string; confidence: number } | null => {
@@ -370,11 +429,13 @@ export const LPR_TEMPORAL_BUFFER_SIZE = 5;
 
 export const selectStableLprDetection = (
   detections: LPRDetection[],
-  minimumRepeats = 2
+  minimumRepeats = 2,
+  allowedPlates: string[] = []
 ): LPRDetection | null => {
   const acceptedDetections = detections
     .map((detection) => {
-      const plate = extractPlateCandidateFromText(detection.plate) ?? normalizePlate(detection.plate);
+      const detectedPlate = extractPlateCandidateFromText(detection.plate) ?? normalizePlate(detection.plate);
+      const plate = resolveDemoPlateByWhitelist(detectedPlate, allowedPlates) ?? detectedPlate;
       return {
         ...detection,
         plate,
@@ -435,14 +496,18 @@ export const selectStableLprDetection = (
   return winner?.detection ?? null;
 };
 
-export const selectBestOcrCandidate = (candidates: OcrCandidate[]): OcrCandidate | null => {
+export const selectBestOcrCandidate = (
+  candidates: OcrCandidate[],
+  allowedPlates: string[] = []
+): OcrCandidate | null => {
   if (candidates.length === 0) {
     return null;
   }
 
   const plateScores = new Map<string, { maxConfidence: number; count: number }>();
   for (const c of candidates) {
-    const plate = extractPlateCandidateFromText(c.plate) ?? normalizePlate(c.plate);
+    const detectedPlate = extractPlateCandidateFromText(c.plate) ?? normalizePlate(c.plate);
+    const plate = resolveDemoPlateByWhitelist(detectedPlate, allowedPlates) ?? detectedPlate;
     if (!validatePlate(plate)) continue;
 
     const existing = plateScores.get(plate);
@@ -498,7 +563,7 @@ const runOcrOnFrames = async (frames: LprFrame | LprFrame[]): Promise<OcrCandida
     }
   }
 
-  const best = selectBestOcrCandidate(candidates);
+  const best = selectBestOcrCandidate(candidates, getDemoAllowedPlates());
   if (!best) {
     throw new Error('No se encontro una patente valida en la imagen');
   }

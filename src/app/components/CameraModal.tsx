@@ -19,6 +19,7 @@ import {
   TARGET_LPR_ACCURACY,
   LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD,
   webcamDemoLprProvider,
+  getDemoAllowedPlates,
   getDisplayConfidence,
   selectStableLprDetection,
 } from '../domain/lpr';
@@ -219,7 +220,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       nextDetection,
     ].slice(-LPR_TEMPORAL_BUFFER_SIZE);
 
-    return selectStableLprDetection(recentDetectionsRef.current);
+    return selectStableLprDetection(recentDetectionsRef.current, 2, getDemoAllowedPlates());
   };
 
   const scheduleAutomaticScan = (delay = 1200) => {

@@ -11,6 +11,8 @@ import {
   getLprAccuracySummary,
   getLprQualityStatus,
   isLprDetectionAccepted,
+  parseDemoAllowedPlates,
+  resolveDemoPlateByWhitelist,
   webcamDemoLprProvider,
   selectBestOcrCandidate,
   selectStableLprDetection,
@@ -208,6 +210,81 @@ describe('lpr demo provider', () => {
 
   it('returns null when OCR text has no valid plate candidate', () => {
     expect(extractPlateCandidateFromText('SIN VEHICULO')).toBeNull();
+  });
+
+  describe('demo whitelist OCR correction', () => {
+    const demoAllowedPlates = ['ODM957', 'AB123CD', 'NVZ087', 'KNJ605', 'AE622RW'];
+
+    it('normalizes demo whitelist plates and removes duplicates', () => {
+      expect(parseDemoAllowedPlates('Odm 957,Ab123cd,Nvz087,Knj605,Ae622rw,AB123CD')).toEqual(
+        demoAllowedPlates
+      );
+    });
+
+    it('ignores invalid values in the demo whitelist', () => {
+      expect(parseDemoAllowedPlates('ABC123,INVALIDA,12345,AB123CD')).toEqual([
+        'ABC123',
+        'AB123CD',
+      ]);
+    });
+
+    it('corrects the observed AB125CL OCR read to the whitelisted AB123CD plate', () => {
+      expect(resolveDemoPlateByWhitelist('AB125CL', ['AB123CD'])).toBe('AB123CD');
+    });
+
+    it('corrects nearby demo plates only when there is one clear whitelist candidate', () => {
+      expect(resolveDemoPlateByWhitelist('ODN957', demoAllowedPlates)).toBe('ODM957');
+      expect(resolveDemoPlateByWhitelist('AE622RV', demoAllowedPlates)).toBe('AE622RW');
+    });
+
+    it('does not correct without a configured whitelist', () => {
+      expect(resolveDemoPlateByWhitelist('AB125CL', [])).toBeNull();
+    });
+
+    it('does not correct when the distance is too large', () => {
+      expect(resolveDemoPlateByWhitelist('ZZ999ZZ', demoAllowedPlates)).toBeNull();
+      expect(resolveDemoPlateByWhitelist('ABC999', ['ABC123'])).toBeNull();
+    });
+
+    it('does not correct when two whitelist candidates tie', () => {
+      expect(resolveDemoPlateByWhitelist('AB125CL', ['AB123CL', 'AB127CL'])).toBeNull();
+    });
+
+    it('does not accept invalid plates even when a whitelist exists', () => {
+      expect(resolveDemoPlateByWhitelist('AB12C', ['AB123CD'])).toBeNull();
+      expect(resolveDemoPlateByWhitelist('AB123C1', ['AB123CD'])).toBeNull();
+    });
+
+    it('lets OCR candidate selection apply demo whitelist corrections without changing raw confidence', () => {
+      expect(
+        selectBestOcrCandidate(
+          [{ plate: 'AB125CL', confidence: 0.74 }],
+          demoAllowedPlates
+        )
+      ).toEqual({ plate: 'AB123CD', confidence: 0.74 });
+    });
+
+    it('lets temporal scoring count whitelisted OCR corrections as stable evidence', () => {
+      const createDetection = (plate: string, confidence: number) => ({
+        plate,
+        confidence,
+        timestamp: '2026-05-13T10:00:00.000Z',
+        isValid: isLprDetectionAccepted(plate, confidence),
+        source: 'camera' as const,
+      });
+
+      const result = selectStableLprDetection(
+        [
+          createDetection('AB125CL', 0.72),
+          createDetection('ZZ999ZZ', 0.97),
+          createDetection('AB123CD', 0.76),
+        ],
+        2,
+        demoAllowedPlates
+      );
+
+      expect(result).toMatchObject({ plate: 'AB123CD', confidence: 0.76 });
+    });
   });
 
   it('extracts the strongest valid plate from Plate Recognizer results', () => {
