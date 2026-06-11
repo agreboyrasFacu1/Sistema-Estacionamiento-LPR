@@ -78,7 +78,7 @@ function Test-Winget {
   return Test-CommandAvailable "winget"
 }
 
-function Refresh-ProcessPath {
+function Update-ProcessPath {
   # @CONTEXT: winget puede instalar Node/Docker y dejar PATH actualizado solo para nuevas terminales.
   $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -91,7 +91,7 @@ function Install-NodeWithWinget {
   }
 
   Invoke-CheckedCommand "winget" @("install", "--id", "OpenJS.NodeJS.LTS", "--source", "winget")
-  Refresh-ProcessPath
+  Update-ProcessPath
 }
 
 function Install-DockerWithWinget {
@@ -100,7 +100,7 @@ function Install-DockerWithWinget {
   }
 
   Invoke-CheckedCommand "winget" @("install", "--id", "Docker.DockerDesktop", "--source", "winget")
-  Refresh-ProcessPath
+  Update-ProcessPath
 }
 
 function Test-NodeRuntime {
@@ -153,7 +153,7 @@ function Start-DockerDesktop {
   return $true
 }
 
-function Ensure-NodeRuntime {
+function Initialize-NodeRuntime {
   # STEP 1: Validar Node/npm; STEP 2: instalar solo con confirmacion explicita.
   if (Test-NodeRuntime) {
     return
@@ -174,7 +174,7 @@ function Ensure-NodeRuntime {
   }
 }
 
-function Ensure-DockerRuntime {
+function Initialize-DockerRuntime {
   # @SECURITY: Docker Desktop se instala o abre solo si el usuario lo confirma.
   if (-not (Test-CommandAvailable "docker")) {
     if ($NonInteractive) {
@@ -303,7 +303,7 @@ function Install-DependenciesIfNeeded {
 }
 
 function Start-NodeRuntime {
-  Ensure-NodeRuntime
+  Initialize-NodeRuntime
 
   Install-DependenciesIfNeeded
 
@@ -330,7 +330,7 @@ function Start-NodeRuntime {
 }
 
 function Start-DockerRuntime {
-  Ensure-DockerRuntime
+  Initialize-DockerRuntime
 
   Write-Info "Runtime Docker listo."
 
