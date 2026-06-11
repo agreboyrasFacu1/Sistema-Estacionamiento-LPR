@@ -31,11 +31,7 @@ export const isLprDetectionAccepted = (
   threshold: number = LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD
 ): boolean => validatePlate(plate) && confidence >= threshold;
 
-/**
- * Devuelve la confianza visual para la demo.
- * Si la lectura es aceptada, muestra el objetivo (por ej 95%).
- * Si no, muestra el valor crudo.
- */
+// @CONTEXT: Confianza visual de demo; no usar para metricas QA ni persistencia.
 export const getDisplayConfidence = (
   isValid: boolean,
   rawConfidence: number,
@@ -369,6 +365,75 @@ export interface OcrCandidate {
   plate: string;
   confidence: number;
 }
+
+export const LPR_TEMPORAL_BUFFER_SIZE = 5;
+
+export const selectStableLprDetection = (
+  detections: LPRDetection[],
+  minimumRepeats = 2
+): LPRDetection | null => {
+  const acceptedDetections = detections
+    .map((detection) => {
+      const plate = normalizePlate(detection.plate);
+      return {
+        ...detection,
+        plate,
+        isValid: isLprDetectionAccepted(plate, detection.confidence),
+      };
+    })
+    .filter((detection) => detection.isValid);
+
+  if (acceptedDetections.length === 0) return null;
+
+  const scores = new Map<
+    string,
+    { count: number; maxConfidence: number; bestDetection: LPRDetection }
+  >();
+
+  for (const detection of acceptedDetections) {
+    const existing = scores.get(detection.plate);
+    if (!existing) {
+      scores.set(detection.plate, {
+        count: 1,
+        maxConfidence: detection.confidence,
+        bestDetection: detection,
+      });
+      continue;
+    }
+
+    existing.count += 1;
+    if (detection.confidence > existing.maxConfidence) {
+      existing.maxConfidence = detection.confidence;
+      existing.bestDetection = detection;
+    }
+  }
+
+  let winner: {
+    score: number;
+    confidence: number;
+    detection: LPRDetection;
+  } | null = null;
+
+  // @PERFORMANCE: Votar sobre el buffer reciente evita ejecutar variantes OCR extra por lecturas aisladas.
+  for (const stats of scores.values()) {
+    if (stats.count < minimumRepeats) continue;
+
+    const score = stats.count + stats.maxConfidence;
+    if (
+      !winner ||
+      score > winner.score ||
+      (score === winner.score && stats.maxConfidence > winner.confidence)
+    ) {
+      winner = {
+        score,
+        confidence: stats.maxConfidence,
+        detection: stats.bestDetection,
+      };
+    }
+  }
+
+  return winner?.detection ?? null;
+};
 
 export const selectBestOcrCandidate = (candidates: OcrCandidate[]): OcrCandidate | null => {
   if (candidates.length === 0) {

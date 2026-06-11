@@ -14,7 +14,14 @@ import {
   Hand,
 } from 'lucide-react';
 import { useParking } from '../contexts/ParkingContext';
-import { TARGET_LPR_ACCURACY, LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD, webcamDemoLprProvider, getDisplayConfidence } from '../domain/lpr';
+import {
+  LPR_TEMPORAL_BUFFER_SIZE,
+  TARGET_LPR_ACCURACY,
+  LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD,
+  webcamDemoLprProvider,
+  getDisplayConfidence,
+  selectStableLprDetection,
+} from '../domain/lpr';
 import type { LprFrame } from '../domain/lpr';
 import { normalizePlate, validatePlate } from '../domain/plates';
 import { LPRDetection } from '../types';
@@ -182,7 +189,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dotsRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const stableDetectionRef = useRef({ plate: '', count: 0 });
+  const recentDetectionsRef = useRef<LPRDetection[]>([]);
 
   const stopStream = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -203,23 +210,16 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   };
 
   const resetStableDetection = () => {
-    stableDetectionRef.current = { plate: '', count: 0 };
+    recentDetectionsRef.current = [];
   };
 
-  const confirmStableDetection = (nextDetection: LPRDetection): boolean => {
-    const plate = normalizePlate(nextDetection.plate);
+  const resolveStableDetection = (nextDetection: LPRDetection): LPRDetection | null => {
+    recentDetectionsRef.current = [
+      ...recentDetectionsRef.current,
+      nextDetection,
+    ].slice(-LPR_TEMPORAL_BUFFER_SIZE);
 
-    if (stableDetectionRef.current.plate === plate) {
-      stableDetectionRef.current.count += 1;
-    } else {
-      stableDetectionRef.current = { plate, count: 1 };
-    }
-
-    if (nextDetection.confidence >= 0.85) {
-      return true;
-    }
-
-    return stableDetectionRef.current.count >= 2;
+    return selectStableLprDetection(recentDetectionsRef.current);
   };
 
   const scheduleAutomaticScan = (delay = 1200) => {
@@ -329,10 +329,15 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         );
         return;
       }
-      if (captureMode === 'webcam-demo' && !confirmStableDetection(nextDetection)) {
-        setCameraState('scanning');
-        setScanSignal('steady');
-        scheduleAutomaticScan(650);
+      if (captureMode === 'webcam-demo') {
+        const stableDetection = resolveStableDetection(nextDetection);
+        if (!stableDetection) {
+          setCameraState('scanning');
+          setScanSignal('steady');
+          scheduleAutomaticScan(650);
+          return;
+        }
+        applyDetection(stableDetection);
         return;
       }
       applyDetection(nextDetection);
@@ -382,6 +387,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       );
       return;
     }
+    // @SECURITY: Registrar confianza OCR real; el 95% visual solo pertenece a UI demo.
     recordLprCorrection(detectedPlate, plate, confidence);
     onPlateDetected(plate);
     cleanup();
