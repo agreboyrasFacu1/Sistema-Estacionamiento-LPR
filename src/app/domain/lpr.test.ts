@@ -259,6 +259,25 @@ describe('lpr demo provider', () => {
       // ABC123 has max 0.75 + bonus 0.20 = 0.95 vs XYZ987 max 0.82
       expect(selectBestOcrCandidate(candidates)).toEqual({ plate: 'ABC123', confidence: 0.75 });
     });
+
+    it('groups OCR-equivalent candidates after positional normalization', () => {
+      const candidates = [
+        { plate: 'A8C123', confidence: 0.74 },
+        { plate: 'XYZ987', confidence: 0.91 },
+        { plate: 'ABC123', confidence: 0.77 },
+      ];
+
+      expect(selectBestOcrCandidate(candidates)).toEqual({ plate: 'ABC123', confidence: 0.77 });
+    });
+
+    it('ignores OCR candidates that cannot become a valid plate', () => {
+      expect(
+        selectBestOcrCandidate([
+          { plate: '12345', confidence: 0.99 },
+          { plate: 'SINLECTURA', confidence: 0.98 },
+        ])
+      ).toBeNull();
+    });
   });
 
   describe('selectStableLprDetection', () => {
@@ -273,6 +292,17 @@ describe('lpr demo provider', () => {
     it('prioritizes a repeated plate over an isolated higher-confidence reading', () => {
       const result = selectStableLprDetection([
         createDetection('ABC123', 0.73),
+        createDetection('XYZ987', 0.99),
+        createDetection('ABC123', 0.76),
+      ]);
+
+      expect(result?.plate).toBe('ABC123');
+      expect(result?.confidence).toBe(0.76);
+    });
+
+    it('counts OCR-equivalent readings as evidence for the same valid plate', () => {
+      const result = selectStableLprDetection([
+        createDetection('A8C123', 0.73),
         createDetection('XYZ987', 0.99),
         createDetection('ABC123', 0.76),
       ]);
@@ -314,6 +344,11 @@ describe('lpr demo provider', () => {
   });
 
   describe('getDisplayConfidence', () => {
+    it('keeps the target and operational thresholds explicit', () => {
+      expect(TARGET_LPR_ACCURACY).toBe(0.95);
+      expect(LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD).toBe(0.70);
+    });
+
     it('returns target accuracy (e.g. 95) if detection is valid regardless of raw confidence', () => {
       const rawConfidence = 0.75;
 

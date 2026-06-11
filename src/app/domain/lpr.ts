@@ -374,7 +374,7 @@ export const selectStableLprDetection = (
 ): LPRDetection | null => {
   const acceptedDetections = detections
     .map((detection) => {
-      const plate = normalizePlate(detection.plate);
+      const plate = extractPlateCandidateFromText(detection.plate) ?? normalizePlate(detection.plate);
       return {
         ...detection,
         plate,
@@ -442,13 +442,20 @@ export const selectBestOcrCandidate = (candidates: OcrCandidate[]): OcrCandidate
 
   const plateScores = new Map<string, { maxConfidence: number; count: number }>();
   for (const c of candidates) {
-    const existing = plateScores.get(c.plate);
+    const plate = extractPlateCandidateFromText(c.plate) ?? normalizePlate(c.plate);
+    if (!validatePlate(plate)) continue;
+
+    const existing = plateScores.get(plate);
     if (existing) {
       existing.count += 1;
       existing.maxConfidence = Math.max(existing.maxConfidence, c.confidence);
     } else {
-      plateScores.set(c.plate, { maxConfidence: c.confidence, count: 1 });
+      plateScores.set(plate, { maxConfidence: c.confidence, count: 1 });
     }
+  }
+
+  if (plateScores.size === 0) {
+    return null;
   }
 
   let bestPlate = '';

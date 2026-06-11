@@ -533,7 +533,11 @@ export const CameraModal: React.FC<CameraModalProps> = ({
                 </div>
               </div>
               <div className="rounded-full bg-black/70 px-4 py-1.5 text-xs font-medium tracking-wider text-blue-200">
-                {isReadingFrame ? `LEYENDO PATENTE${'.'.repeat(dots)}` : `LECTURA AUTOMATICA ACTIVA${'.'.repeat(dots)}`}
+                {isReadingFrame
+                  ? `LEYENDO PATENTE${'.'.repeat(dots)}`
+                  : scanSignal === 'steady'
+                    ? `BUSCANDO LECTURA ESTABLE${'.'.repeat(dots)}`
+                    : `ACERQUE LA PATENTE AL RECUADRO${'.'.repeat(dots)}`}
               </div>
             </div>
           )}
