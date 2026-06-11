@@ -13,6 +13,7 @@ import {
   isLprDetectionAccepted,
   webcamDemoLprProvider,
   selectBestOcrCandidate,
+  selectStableLprDetection,
   getDisplayConfidence,
 } from './lpr';
 import { validatePlate } from './plates';
@@ -193,6 +194,8 @@ describe('lpr demo provider', () => {
   it('extracts legacy and Mercosur plates from OCR text', () => {
     expect(extractPlateCandidateFromText('PATENTE ABC123')).toBe('ABC123');
     expect(extractPlateCandidateFromText('AB 123 CD')).toBe('AB123CD');
+    expect(validatePlate('ABC123')).toBe(true);
+    expect(validatePlate('AB123CD')).toBe(true);
   });
 
   it('normalizes common OCR confusions by plate position', () => {
@@ -200,6 +203,7 @@ describe('lpr demo provider', () => {
     expect(extractPlateCandidateFromText('A8C12S')).toBe('ABC125');
     expect(extractPlateCandidateFromText('A67591H')).toBe('AG759LH');
     expect(extractPlateCandidateFromText('AGT59LH')).toBe('AG759LH');
+    expect(extractPlateCandidateFromText('A8C12')).toBeNull();
   });
 
   it('returns null when OCR text has no valid plate candidate', () => {
@@ -257,15 +261,85 @@ describe('lpr demo provider', () => {
     });
   });
 
+  describe('selectStableLprDetection', () => {
+    const createDetection = (plate: string, confidence: number) => ({
+      plate,
+      confidence,
+      timestamp: '2026-05-13T10:00:00.000Z',
+      isValid: isLprDetectionAccepted(plate, confidence),
+      source: 'camera' as const,
+    });
+
+    it('prioritizes a repeated plate over an isolated higher-confidence reading', () => {
+      const result = selectStableLprDetection([
+        createDetection('ABC123', 0.73),
+        createDetection('XYZ987', 0.99),
+        createDetection('ABC123', 0.76),
+      ]);
+
+      expect(result?.plate).toBe('ABC123');
+      expect(result?.confidence).toBe(0.76);
+    });
+
+    it('uses raw confidence as the tie breaker without using visual display confidence', () => {
+      const result = selectStableLprDetection([
+        createDetection('ABC123', 0.72),
+        createDetection('XYZ987', 0.81),
+        createDetection('ABC123', 0.74),
+        createDetection('XYZ987', 0.86),
+      ]);
+
+      expect(result?.plate).toBe('XYZ987');
+      expect(result?.confidence).toBe(0.86);
+      expect(
+        getDisplayConfidence(Boolean(result?.isValid), result?.confidence ?? 0)
+      ).toBe(95);
+    });
+
+    it('does not accept invalid or below-threshold detections even with high confidence', () => {
+      expect(
+        selectStableLprDetection([
+          createDetection('12345', 0.99),
+          createDetection('12345', 0.98),
+        ])
+      ).toBeNull();
+
+      expect(
+        selectStableLprDetection([
+          createDetection('ABC123', LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD - 0.01),
+          createDetection('ABC123', LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD - 0.02),
+        ])
+      ).toBeNull();
+    });
+  });
+
   describe('getDisplayConfidence', () => {
     it('returns target accuracy (e.g. 95) if detection is valid regardless of raw confidence', () => {
-      expect(getDisplayConfidence(true, 0.75)).toBe(95);
+      const rawConfidence = 0.75;
+
+      expect(getDisplayConfidence(true, rawConfidence)).toBe(95);
       expect(getDisplayConfidence(true, 0.99)).toBe(95);
+      expect(rawConfidence).toBe(0.75);
     });
 
     it('returns raw confidence if detection is invalid', () => {
       expect(getDisplayConfidence(false, 0.65)).toBe(65);
       expect(getDisplayConfidence(false, 0.20)).toBe(20);
     });
+  });
+
+  it('keeps QA validation metrics based on plate matches instead of visual confidence', () => {
+    const result = calculateLprValidationResult([
+      {
+        expectedPlate: 'ABC123',
+        detectedPlate: 'ABC123',
+        confidence: LPR_OPERATIONAL_ACCEPTANCE_THRESHOLD,
+        source: 'controlled-sample',
+        timestamp: '2026-05-13T10:00:00.000Z',
+      },
+    ]);
+
+    expect(result.accuracy).toBe(1);
+    expect(result.targetAccuracy).toBe(TARGET_LPR_ACCURACY);
   });
 });
